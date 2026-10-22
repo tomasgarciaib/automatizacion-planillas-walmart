@@ -3,8 +3,8 @@
 {% block content %}
 <section class="intro">
   <p class="eyebrow">Fuente de trabajo</p>
-  <h1>Productos pendientes de preparar</h1>
-  <p>Elige un producto desde la hoja compartida. La aplicación toma sus SKU, precio, medidas, peso y tallas para completar la plantilla de Walmart.</p>
+  <h1>SKU ML sin asignar</h1>
+  <p>Elige un SKU ML pendiente. La aplicación encuentra su SKU Base y reúne automáticamente todos los SKU ML de ese mismo producto para crear una única planilla Walmart.</p>
   <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Abrir la hoja de productos en Drive</a></p>
 </section>
 
@@ -15,40 +15,42 @@
 {% else %}
 <section class="card search-card">
   <form class="search-form" method="get" action="/">
-    <label for="q">Buscar por SKU, descripción o marca</label>
-    <div><input id="q" name="q" value="{{ query }}" placeholder="Por ejemplo: L-569-14" /><button type="submit">Buscar</button></div>
+    {% if show_all %}<input type="hidden" name="show_all" value="true" />{% endif %}
+    <label for="q">Buscar por SKU Base, SKU ML, descripción o marca</label>
+    <div><input id="q" name="q" value="{{ query }}" placeholder="Por ejemplo: L-RIP-569-14-XS" /><button type="submit">Buscar</button></div>
   </form>
+  <p class="field-help">{% if show_all %}<a href="/">Ver solo SKU ML sin asignar</a>{% else %}<a href="/?show_all=true">Ver también SKU ML ya asignados</a>{% endif %}</p>
 </section>
 
 <section class="section-heading">
   <div>
-    <p class="eyebrow">{{ products|length }} productos</p>
-    <h2>Lista de productos</h2>
+    <p class="eyebrow">{{ sku_items|length }} SKU ML</p>
+    <h2>{% if show_all %}Todos los SKU ML{% else %}Pendientes de asignación{% endif %}</h2>
   </div>
 </section>
 
-{% if products %}
+{% if sku_items %}
 <div class="product-table-wrap">
   <table class="product-table">
     <thead>
-      <tr><th>Producto</th><th>Marca</th><th>Variantes</th><th>Precio final</th><th>Responsable</th><th></th></tr>
+      <tr><th>SKU Base</th><th>SKU ML</th><th>Talla</th><th>Producto</th><th>Responsable</th><th></th></tr>
     </thead>
     <tbody>
-    {% for product in products %}
+    {% for item in sku_items %}
       <tr>
-        <td><strong>{{ product.sku_base }}</strong><span>{{ product.description }}</span></td>
-        <td>{{ product.brand }}</td>
-        <td>{{ product.variants|length }}</td>
-        <td>${{ "{:,}".format(product.price|int).replace(",", ".") }}</td>
-        <td>{{ product.responsible or "Sin asignar" }}</td>
-        <td><a class="button-link" href="/products/{{ product.sku_base }}">Preparar planilla</a></td>
+        <td><strong>{{ item.product.sku_base }}</strong></td>
+        <td><strong>{{ item.variant.sku }}</strong></td>
+        <td>{{ item.variant.size }}</td>
+        <td><span>{{ item.product.description }}</span></td>
+        <td>{{ item.product.responsible or "Sin asignar" }}</td>
+        <td><a class="button-link" href="/sku-ml/{{ item.variant.sku }}">Crear planilla</a></td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<div class="empty-state"><h3>No hay coincidencias</h3><p>Prueba con otro SKU, descripción o marca.</p></div>
+<div class="empty-state"><h3>No hay SKU ML pendientes</h3><p>Prueba buscando un SKU específico o muestra también los productos asignados.</p></div>
 {% endif %}
 {% endif %}
 {% endblock %}

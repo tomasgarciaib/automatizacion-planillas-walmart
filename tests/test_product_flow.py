@@ -51,21 +51,21 @@ def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypa
     app.dependency_overrides[app_settings] = lambda: settings
     client = TestClient(app)
     try:
-        detail = client.get("/products/L-569-14")
+        detail = client.get("/sku-ml/L-RIP-569-14-XS")
         assert detail.status_code == 200
         assert "Pantalón Jogger" in detail.text
 
         with source_template.open("rb") as file:
             upload = client.post(
                 "/walmart-templates",
-                data={"return_sku": product.sku_base},
+                data={"return_sku_ml": "L-RIP-569-14-XS"},
                 files={"file": ("vestuario.xlsx", file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
                 follow_redirects=False,
             )
         assert upload.status_code == 303
 
         generated = client.post(
-            f"/products/{product.sku_base}/generate",
+            "/sku-ml/L-RIP-569-14-XS/generate",
             data={
                 "template_id": "1",
                 "ean_codes": "7801234567890\n7801234567891",

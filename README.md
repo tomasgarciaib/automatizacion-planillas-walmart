@@ -4,7 +4,7 @@ Aplicación web interna para preparar, validar y organizar planillas de producto
 
 ## Estado actual
 
-La aplicación empieza desde la hoja compartida de productos de Drive. Cada integrante busca un SKU base, abre su ficha y genera una planilla de Walmart por producto con una fila por variante.
+La aplicación empieza desde la hoja compartida de productos de Drive. Cada integrante elige un SKU ML sin asignar; el sistema identifica su SKU Base y genera una planilla con una fila por cada SKU ML del grupo.
 
 Para la categoría `Vestuario`, la aplicación completa automáticamente desde Drive los SKU, nombre, marca, precio, dimensiones, peso, tallas, modelo e identificadores de variantes. Conserva las hojas, encabezados, validaciones y formato de la plantilla oficial de Walmart.
 
@@ -25,9 +25,9 @@ Abre `http://127.0.0.1:8000` en el navegador.
 
 ## Prueba con L-569-14
 
-1. Abre la página inicial y busca `L-569-14`.
-2. Pulsa **Preparar planilla**.
-3. Si es la primera vez, carga una copia vigente de la plantilla oficial de Walmart para `Vestuario`, por ejemplo `RIP-2451.xlsx`.
+1. Abre la página inicial y busca `L-RIP-569-14-XS`.
+2. Pulsa **Crear planilla**. El sistema reunirá los cinco SKU ML del SKU Base `L-569-14`.
+3. Si todavía no está configurada, un administrador carga una copia vigente de la plantilla oficial de Walmart para `Vestuario`, por ejemplo `RIP-2451.xlsx`. Esto se hace una vez y se reutiliza para todos los productos.
 4. En el Colab de EAN, configura `number_of_codes` con `5` y pega los cinco códigos resultantes, uno por línea.
 5. Copia desde WordPress las tres URLs de imágenes y completa los textos específicos del producto.
 6. Revisa los datos obtenidos de Drive y pulsa **Generar planilla Walmart**.

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Plantilla Vestuario | Planillas Walmart{% endblock %}
+{% block content %}
+<a class="back-link" href="/">← Volver a SKU ML pendientes</a>
+<section class="intro">
+  <p class="eyebrow">Configuración única</p>
+  <h1>Plantilla fija de Vestuario</h1>
+  <p>Esta es la plantilla que el sistema reutiliza para todos los SKU ML de Vestuario. Antes de generar cada archivo, borra sus productos anteriores y crea una copia nueva.</p>
+</section>
+
+{% if message %}<section class="notice">{{ message }}</section>{% endif %}
+
+<section class="card">
+  {% if template %}
+  <p><strong>Plantilla activa:</strong> {{ template.original_name }}</p>
+  <p class="muted">Cargada: {{ template.uploaded_at }}. Reemplázala solo si Walmart entrega una versión oficial nueva.</p>
+  {% else %}
+  <p class="required-note">No hay una plantilla activa. Carga la plantilla oficial de Vestuario que usa el equipo, por ejemplo RIP-2451.</p>
+  {% endif %}
+  <form class="upload-inline" method="post" action="/walmart-templates" enctype="multipart/form-data">
+    <input name="file" type="file" accept=".xlsx" required />
+    <button type="submit">{% if template %}Actualizar plantilla{% else %}Cargar plantilla de Vestuario{% endif %}</button>
+  </form>
+</section>
+{% endblock %}

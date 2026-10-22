@@ -19,10 +19,11 @@ from app.services.campaigns import (
 )
 from app.services.files import save_upload
 from app.services.source_products import (
+    ProductVariant,
     SourceProduct,
     SourceProductsError,
     fetch_products,
-    get_product,
+    get_product_by_sku_ml,
 )
 from app.services.templates import (
     TemplateProcessingError,
@@ -69,9 +70,10 @@ def health_check() -> dict[str, str]:
 def dashboard(
     request: Request,
     q: str = "",
+    show_all: bool = False,
     settings: Settings = Depends(app_settings),
 ):
-    """Muestra los productos que el equipo debe trabajar desde la hoja de Drive."""
+    """Muestra SKU ML pendientes y permite entrar por el SKU hijo."""
     source_error = None
     products: list[SourceProduct] = []
     try:
@@ -79,30 +81,41 @@ def dashboard(
     except SourceProductsError as error:
         source_error = str(error)
 
+    sku_items = [
+        {"product": product, "variant": variant}
+        for product in products
+        for variant in product.variants
+    ]
     query = q.strip().casefold()
     if query:
-        products = [
-            product
-            for product in products
-            if query in product.sku_base.casefold()
-            or query in product.description.casefold()
-            or query in product.brand.casefold()
+        sku_items = [
+            item
+            for item in sku_items
+            if query in item["product"].sku_base.casefold()
+            or query in item["variant"].sku.casefold()
+            or query in item["product"].description.casefold()
+            or query in item["product"].brand.casefold()
+        ]
+    elif not show_all:
+        sku_items = [
+            item for item in sku_items if not item["product"].responsible.strip()
         ]
 
     return templates.TemplateResponse(
         request,
         "products.html",
         {
-            "products": products,
+            "sku_items": sku_items,
             "query": q,
+            "show_all": show_all,
             "source_error": source_error,
             "source_sheet_url": settings.source_sheet_web_url,
         },
     )
 
 
-def _product_url(sku_base: str, message: str | None = None) -> str:
-    url = f"/products/{quote(sku_base, safe='')}"
+def _sku_ml_url(sku_ml: str, message: str | None = None) -> str:
+    url = f"/sku-ml/{quote(sku_ml, safe='')}"
     return f"{url}?{urlencode({'message': message})}" if message else url
 
 
@@ -110,9 +123,13 @@ def _format_price(value: object) -> str:
     return f"${int(value):,}".replace(",", ".")
 
 
-def _get_source_product(settings: Settings, sku_base: str) -> SourceProduct:
+def _get_source_product(
+    settings: Settings, sku_ml: str
+) -> tuple[SourceProduct, ProductVariant]:
     try:
-        return get_product(fetch_products(settings.source_sheet_csv_url), sku_base)
+        return get_product_by_sku_ml(
+            fetch_products(settings.source_sheet_csv_url), sku_ml
+        )
     except SourceProductsError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -183,14 +200,14 @@ def _build_product_rows(
     return rows
 
 
-@app.get("/products/{sku_base}", response_class=HTMLResponse)
-def product_detail(
-    sku_base: str,
+@app.get("/sku-ml/{sku_ml}", response_class=HTMLResponse)
+def sku_ml_detail(
+    sku_ml: str,
     request: Request,
     message: str | None = None,
     settings: Settings = Depends(app_settings),
 ):
-    product = _get_source_product(settings, sku_base)
+    product, selected_variant = _get_source_product(settings, sku_ml)
     with get_connection(settings.database_path) as connection:
         template = connection.execute(
             "SELECT id, original_name, stored_name, uploaded_at "
@@ -208,6 +225,7 @@ def product_detail(
         "product_detail.html",
         {
             "product": product,
+            "selected_variant": selected_variant,
             "template": template,
             "outputs": outputs,
             "message": message,
@@ -217,9 +235,22 @@ def product_detail(
     )
 
 
+@app.get("/products/{sku_base}")
+def legacy_product_link(sku_base: str, settings: Settings = Depends(app_settings)):
+    """Mantiene los enlaces de la versión anterior durante la transición."""
+    try:
+        products = fetch_products(settings.source_sheet_csv_url)
+        product = next(
+            item for item in products if item.sku_base.casefold() == sku_base.casefold()
+        )
+    except (SourceProductsError, StopIteration) as error:
+        raise HTTPException(status_code=404, detail="No se encontró el producto") from error
+    return RedirectResponse(_sku_ml_url(product.variants[0].sku), status_code=303)
+
+
 @app.post("/walmart-templates")
 async def upload_walmart_template(
-    return_sku: str = Form(...),
+    return_sku_ml: str | None = Form(None),
     file: UploadFile = File(...),
     settings: Settings = Depends(app_settings),
 ):
@@ -230,7 +261,9 @@ async def upload_walmart_template(
             max_bytes=settings.max_upload_mb * 1024 * 1024,
         )
     except ValueError as error:
-        return RedirectResponse(_product_url(return_sku, str(error)), status_code=303)
+        if return_sku_ml:
+            return RedirectResponse(_sku_ml_url(return_sku_ml, str(error)), status_code=303)
+        return RedirectResponse("/configuracion/plantilla", status_code=303)
 
     with get_connection(settings.database_path) as connection:
         connection.execute(
@@ -238,15 +271,24 @@ async def upload_walmart_template(
             (file.filename or "plantilla-walmart.xlsx", stored_name),
         )
         connection.commit()
+    if return_sku_ml:
+        return RedirectResponse(
+            _sku_ml_url(
+                return_sku_ml,
+                "Plantilla Vestuario actualizada. Se limpiará antes de cada generación.",
+            ),
+            status_code=303,
+        )
     return RedirectResponse(
-        _product_url(return_sku, "Plantilla Vestuario cargada. Ya puedes preparar el producto."),
+        "/configuracion/plantilla?message="
+        + quote("Plantilla Vestuario actualizada. Se limpiará antes de cada generación."),
         status_code=303,
     )
 
 
-@app.post("/products/{sku_base}/generate")
+@app.post("/sku-ml/{sku_ml}/generate")
 def generate_product_template(
-    sku_base: str,
+    sku_ml: str,
     template_id: int = Form(...),
     ean_codes: str = Form(...),
     main_image_url: str = Form(...),
@@ -263,7 +305,7 @@ def generate_product_template(
     keywords: str = Form(...),
     settings: Settings = Depends(app_settings),
 ):
-    product = _get_source_product(settings, sku_base)
+    product, _ = _get_source_product(settings, sku_ml)
     entered_values = {
         "URL imagen principal": main_image_url,
         "URL imagen secundaria": image_2_url,
@@ -281,28 +323,28 @@ def generate_product_template(
     missing = [label for label, value in entered_values.items() if not value.strip()]
     if missing:
         return RedirectResponse(
-            _product_url(sku_base, f"Falta completar: {', '.join(missing)}."),
+            _sku_ml_url(sku_ml, f"Falta completar: {', '.join(missing)}."),
             status_code=303,
         )
 
     codes = [line.strip() for line in ean_codes.splitlines() if line.strip()]
     if len(codes) != len(product.variants):
         return RedirectResponse(
-            _product_url(
-                sku_base,
+            _sku_ml_url(
+                sku_ml,
                 f"Debes pegar {len(product.variants)} códigos EAN, uno por cada variante.",
             ),
             status_code=303,
         )
     if len(set(codes)) != len(codes) or any(not EAN_PATTERN.fullmatch(code) for code in codes):
         return RedirectResponse(
-            _product_url(sku_base, "Los EAN deben ser códigos numéricos únicos de 8 a 14 dígitos."),
+            _sku_ml_url(sku_ml, "Los EAN deben ser códigos numéricos únicos de 8 a 14 dígitos."),
             status_code=303,
         )
     image_urls = (main_image_url, image_2_url, image_3_url)
     if any(not value.strip().lower().startswith(("https://", "http://")) for value in image_urls):
         return RedirectResponse(
-            _product_url(sku_base, "Las tres imágenes deben tener una URL que comience con http:// o https://."),
+            _sku_ml_url(sku_ml, "Las tres imágenes deben tener una URL que comience con http:// o https://."),
             status_code=303,
         )
 
@@ -313,14 +355,14 @@ def generate_product_template(
         ).fetchone()
         if template is None:
             return RedirectResponse(
-                _product_url(sku_base, "La plantilla seleccionada ya no está disponible."),
+                _sku_ml_url(sku_ml, "La plantilla seleccionada ya no está disponible."),
                 status_code=303,
             )
 
         source_path = settings.uploads_dir / Path(template["stored_name"]).name
         if not source_path.is_file():
             return RedirectResponse(
-                _product_url(sku_base, "No se encontró el archivo de plantilla. Vuelve a cargarlo."),
+                _sku_ml_url(sku_ml, "No se encontró el archivo de plantilla. Vuelve a cargarlo."),
                 status_code=303,
             )
 
@@ -349,7 +391,7 @@ def generate_product_template(
                 ),
             )
         except TemplateProcessingError as error:
-            return RedirectResponse(_product_url(sku_base, str(error)), status_code=303)
+            return RedirectResponse(_sku_ml_url(sku_ml, str(error)), status_code=303)
 
         connection.execute(
             "INSERT INTO product_outputs (sku_base, original_name, stored_name) VALUES (?, ?, ?)",
@@ -357,8 +399,26 @@ def generate_product_template(
         )
         connection.commit()
     return RedirectResponse(
-        _product_url(sku_base, "Planilla completada y lista para descargar."),
+        _sku_ml_url(sku_ml, "Planilla completada y lista para descargar."),
         status_code=303,
+    )
+
+
+@app.get("/configuracion/plantilla", response_class=HTMLResponse)
+def template_settings(
+    request: Request,
+    message: str | None = None,
+    settings: Settings = Depends(app_settings),
+):
+    with get_connection(settings.database_path) as connection:
+        template = connection.execute(
+            "SELECT original_name, uploaded_at FROM walmart_templates "
+            "WHERE category = 'Vestuario' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    return templates.TemplateResponse(
+        request,
+        "template_settings.html",
+        {"template": template, "message": message},
     )
 
 

@@ -2,7 +2,7 @@
 
 ## Qué hace hoy el software
 
-La aplicación lee los productos desde la hoja de Drive configurada, permite escoger un SKU base y genera una planilla de Walmart con una fila por cada talla o variante del producto.
+La aplicación lee los productos desde la hoja de Drive configurada, muestra los SKU ML sin asignar y genera una planilla de Walmart con una fila por cada SKU ML que comparte el mismo SKU Base.
 
 Para `Vestuario`, completa automáticamente los SKU, nombre, marca, precio, medidas, peso, país de origen, fabricante, cantidad, unidad, modelo, grupo de variantes y tallas. Conserva las hojas internas, validaciones, encabezados e instrucciones de Walmart.
 
@@ -16,9 +16,9 @@ Para `Vestuario`, completa automáticamente los SKU, nombre, marca, precio, medi
 ## Preparar L-569-14
 
 1. Inicia la aplicación y abre `http://127.0.0.1:8000`.
-2. Busca `L-569-14` y pulsa `Preparar planilla`.
-3. Confirma que aparezcan las cinco variantes: XS, S, M, L y XL.
-4. Si todavía no hay una plantilla cargada, adjunta la plantilla oficial vigente de `Vestuario`, por ejemplo `RIP-2451.xlsx`.
+2. Busca `L-RIP-569-14-XS` y pulsa `Crear planilla`.
+3. Confirma que el sistema detecte el SKU Base `L-569-14` y sus cinco SKU ML: XS, S, M, L y XL.
+4. Si todavía no hay una plantilla fija configurada, un administrador la carga una vez desde `Plantilla Vestuario`.
 5. Abre el Colab de EAN. Cambia `number_of_codes` a `5`, ejecútalo y pega los cinco códigos en el mismo orden de las variantes.
 6. En WordPress, busca el SKU base. Copia la imagen 1 como principal, la imagen 2 como secundaria y la imagen 3 como secundaria 1.
 7. Completa descripción larga, descripción corta, material, características, palabras clave y los dos textos de garantía que corresponden a este producto.

@@ -2,7 +2,7 @@
 
 ## Primera versión
 
-La aplicación lee una hoja fuente de productos de Google Sheets y organiza el trabajo por SKU base. Para cada producto, recibe una plantilla oficial de Walmart y genera un archivo por sus variantes.
+La aplicación lee una hoja fuente de productos de Google Sheets y organiza el trabajo por SKU ML. Al elegir uno, identifica su SKU Base, reúne sus variantes y genera una planilla desde la plantilla fija de Walmart.
 
 La base de datos SQLite y los archivos locales se usan solo durante el desarrollo. No se debe publicar esta configuración tal cual para el equipo remoto.
 

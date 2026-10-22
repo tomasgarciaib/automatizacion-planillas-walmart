@@ -148,3 +148,14 @@ def get_product(products: Iterable[SourceProduct], sku_base: str) -> SourceProdu
         if product.sku_base.casefold() == sku_base.casefold():
             return product
     raise SourceProductsError(f"No se encontró el producto {sku_base} en la hoja fuente")
+
+
+def get_product_by_sku_ml(
+    products: Iterable[SourceProduct], sku_ml: str
+) -> tuple[SourceProduct, ProductVariant]:
+    """Busca un SKU ML y devuelve el grupo de variantes al que pertenece."""
+    for product in products:
+        for variant in product.variants:
+            if variant.sku.casefold() == sku_ml.casefold():
+                return product, variant
+    raise SourceProductsError(f"No se encontró el SKU ML {sku_ml} en la hoja fuente")

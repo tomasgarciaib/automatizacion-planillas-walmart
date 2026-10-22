@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.services.source_products import _group_products
+from app.services.source_products import _group_products, get_product_by_sku_ml
 
 
 def _source_row(
@@ -60,3 +60,8 @@ def test_groups_variants_and_reads_chilean_numbers():
     assert product.shipping_weight_kg == Decimal("0.296")
     assert product.suggested_color == "Verde Esmeralda"
     assert [variant.size for variant in product.variants] == ["Xs", "S"]
+    selected_product, selected_variant = get_product_by_sku_ml(
+        products, "L-RIP-569-14-S"
+    )
+    assert selected_product.sku_base == "L-569-14"
+    assert selected_variant.size == "S"
