@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -15,11 +16,15 @@ from app.services.campaigns import (
     update_status,
 )
 from app.services.files import save_upload
+from app.services.templates import TemplateProcessingError, create_clean_template
 from app.settings import Settings, get_settings
 
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+UPLOAD_DOCUMENT_TYPES = {"Fuente", "Plantilla Walmart"}
+GENERATED_DOCUMENT_TYPE = "Plantilla limpia"
 
 
 @asynccontextmanager
@@ -82,7 +87,7 @@ def campaign_detail(
         try:
             campaign = get_campaign(connection, campaign_id)
             documents = connection.execute(
-                "SELECT id, document_type, original_name, uploaded_at "
+                "SELECT id, document_type, original_name, stored_name, uploaded_at "
                 "FROM documents WHERE campaign_id = ? ORDER BY id DESC",
                 (campaign_id,),
             ).fetchall()
@@ -94,6 +99,10 @@ def campaign_detail(
         {
             "campaign": campaign,
             "documents": documents,
+            "has_walmart_template": any(
+                document["document_type"] == "Plantilla Walmart"
+                for document in documents
+            ),
             "statuses": VALID_STATUSES,
         },
     )
@@ -106,7 +115,7 @@ async def upload_document(
     file: UploadFile = File(...),
     settings: Settings = Depends(app_settings),
 ):
-    if document_type not in {"Fuente", "Plantilla Walmart"}:
+    if document_type not in UPLOAD_DOCUMENT_TYPES:
         raise HTTPException(status_code=400, detail="Tipo de documento no válido")
     with get_connection(settings.database_path) as connection:
         try:
@@ -130,6 +139,65 @@ async def upload_document(
         )
         connection.commit()
     return RedirectResponse(url=f"/campaigns/{campaign_id}", status_code=303)
+
+
+@app.post("/campaigns/{campaign_id}/clean-template")
+def create_clean_campaign_template(
+    campaign_id: int, settings: Settings = Depends(app_settings)
+):
+    """Genera una copia de la última plantilla Walmart sin filas de productos."""
+    with get_connection(settings.database_path) as connection:
+        try:
+            get_campaign(connection, campaign_id)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+        template = connection.execute(
+            "SELECT original_name, stored_name FROM documents "
+            "WHERE campaign_id = ? AND document_type = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (campaign_id, "Plantilla Walmart"),
+        ).fetchone()
+        if template is None:
+            raise HTTPException(status_code=400, detail="Primero adjunta una plantilla Walmart")
+
+        source_path = settings.uploads_dir / Path(template["stored_name"]).name
+        original_stem = Path(template["original_name"]).stem
+        display_name = f"{original_stem}-plantilla-limpia.xlsx"
+        stored_name = f"{uuid4().hex}.xlsx"
+        output_path = settings.uploads_dir / stored_name
+
+        try:
+            create_clean_template(source_path, output_path)
+        except TemplateProcessingError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+        connection.execute(
+            "INSERT INTO documents (campaign_id, document_type, original_name, stored_name) "
+            "VALUES (?, ?, ?, ?)",
+            (campaign_id, GENERATED_DOCUMENT_TYPE, display_name, stored_name),
+        )
+        connection.commit()
+    return RedirectResponse(url=f"/campaigns/{campaign_id}", status_code=303)
+
+
+@app.get("/documents/{document_id}/download")
+def download_document(document_id: int, settings: Settings = Depends(app_settings)):
+    with get_connection(settings.database_path) as connection:
+        document = connection.execute(
+            "SELECT original_name, stored_name FROM documents WHERE id = ?", (document_id,)
+        ).fetchone()
+    if document is None:
+        raise HTTPException(status_code=404, detail="No se encontró el documento")
+
+    file_path = settings.uploads_dir / Path(document["stored_name"]).name
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="El archivo ya no está disponible")
+    return FileResponse(
+        file_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=document["original_name"],
+    )
 
 
 @app.post("/campaigns/{campaign_id}/status")

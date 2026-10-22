@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Pregunta sobre el flujo de planillas
+    url: https://github.com/tomasgarciaib/automatizacion-planillas-walmart/blob/main/docs/USER_GUIDE.md
+    about: Revisa primero la guía de uso del piloto.

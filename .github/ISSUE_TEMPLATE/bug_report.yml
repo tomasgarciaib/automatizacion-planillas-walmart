@@ -1,0 +1,25 @@
+name: Reportar un error
+description: Registra un problema reproducible de la aplicación.
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Qué ocurrió
+      description: No pegues datos sensibles ni planillas completas.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para repetirlo
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Qué esperabas que ocurriera
+    validations:
+      required: true

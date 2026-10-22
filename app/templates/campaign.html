@@ -21,10 +21,21 @@
       <label>Archivo Excel (.xlsx)<input name="file" type="file" accept=".xlsx" required /></label>
       <button type="submit">Adjuntar archivo</button>
     </form>
+    {% if has_walmart_template %}
+    <form class="action-form" method="post" action="/campaigns/{{ campaign.id }}/clean-template">
+      <button type="submit">Crear plantilla limpia</button>
+      <p class="muted">Conserva las hojas, instrucciones y formato de Walmart; elimina solo las filas de productos desde la fila 10.</p>
+    </form>
+    {% endif %}
     {% if documents %}
     <ul class="document-list">
       {% for document in documents %}
-      <li><strong>{{ document.document_type }}</strong><span>{{ document.original_name }}</span><small>{{ document.uploaded_at }}</small></li>
+      <li>
+        <strong>{{ document.document_type }}</strong>
+        <span>{{ document.original_name }}</span>
+        <small>{{ document.uploaded_at }}</small>
+        <a href="/documents/{{ document.id }}/download">Descargar</a>
+      </li>
       {% endfor %}
     </ul>
     {% else %}

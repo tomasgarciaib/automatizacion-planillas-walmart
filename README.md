@@ -2,21 +2,11 @@
 
 Aplicación web interna para preparar, validar y organizar planillas de productos antes de cargarlas en Walmart.
 
-## Objetivo de la primera versión
+## Estado actual
 
-La primera versión no utiliza IA ni realiza cargas a Walmart. Permitirá al equipo:
+La primera función disponible permite adjuntar una plantilla oficial de Walmart y crear una copia limpia para comenzar una carga nueva. La copia conserva la estructura técnica del archivo y elimina únicamente los datos de productos desde la fila 10 de la hoja `Vestuario`.
 
-- Crear campañas por marca y descuento.
-- Cargar la planilla fuente y la plantilla oficial de Walmart.
-- Mantener un registro centralizado de los archivos y sus estados.
-- Dejar la base lista para implementar la generación de planillas, Google Drive, WordPress y, posteriormente, IA.
-
-## Tecnología
-
-- **Backend y web:** Python + FastAPI.
-- **Datos de desarrollo:** SQLite.
-- **Planillas:** OpenPyXL.
-- **Despliegue futuro:** Docker + Google Cloud Run.
+Esta versión todavía no usa IA, no completa productos desde la planilla fuente, no se conecta con Google Drive, WordPress ni carga archivos en Walmart. Es una base de trabajo local para validar el flujo con el equipo.
 
 ## Ejecutar localmente
 
@@ -29,7 +19,17 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-Luego abre `http://127.0.0.1:8000`.
+Abre `http://127.0.0.1:8000` en el navegador.
+
+## Prueba con RIP-2451
+
+1. Crea una campaña de prueba.
+2. Adjunta `RIP-2451.xlsx` como **Plantilla Walmart**.
+3. Pulsa **Crear plantilla limpia**.
+4. Descarga el archivo generado desde la lista de documentos.
+5. Completa la copia descargada. No modifiques las filas de instrucciones ni la hoja técnica oculta.
+
+Lee la guía completa en [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Pruebas
 
@@ -37,15 +37,13 @@ Luego abre `http://127.0.0.1:8000`.
 pytest
 ```
 
+## Colaboración
+
+Antes de modificar el proyecto, lee [CONTRIBUTING.md](CONTRIBUTING.md) y la configuración recomendada de GitHub en [docs/GITHUB_SETUP.md](docs/GITHUB_SETUP.md).
+
 ## Seguridad
 
 - No subir contraseñas, claves de API, archivos de cuentas de servicio ni planillas reales con información sensible.
 - Usar `.env` solamente en desarrollo.
-- Cuando se publique, las credenciales se guardarán en Google Secret Manager.
-
-## Próximos pasos
-
-1. Definir el mapeo exacto para la primera marca piloto.
-2. Implementar generación y validación de la plantilla Walmart.
-3. Conectar Drive y el estado de las campañas.
-4. Incorporar WordPress e IA como integraciones opcionales.
+- No publicar planillas de productos en GitHub: los archivos cargados y generados se excluyen mediante `.gitignore`.
+- Cuando se publique la aplicación, las credenciales se guardarán en Google Secret Manager.

@@ -1,0 +1,25 @@
+name: Proponer una mejora
+description: Registra una función antes de implementarla.
+title: "feat: "
+labels: ["mejora"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema a resolver
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Describe el resultado esperado, no una solución técnica obligatoria.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Cómo sabremos que está listo
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
