@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} | Planillas Walmart{% endblock %}
+{% block content %}
+<a class="back-link" href="/">← Volver a campañas</a>
+<section class="intro campaign-header">
+  <div>
+    <p class="eyebrow">{{ campaign.brand }} · {{ campaign.discount }}</p>
+    <h1>{{ campaign.name }}</h1>
+  </div>
+  <span class="badge badge-large">{{ campaign.status }}</span>
+</section>
+
+<div class="two-column">
+  <section class="card">
+    <h2>Archivos de trabajo</h2>
+    <p>Adjunta la planilla fuente y la plantilla oficial de Walmart. Los archivos se guardan solo en el entorno de desarrollo por ahora.</p>
+    <form class="upload-form" method="post" action="/campaigns/{{ campaign.id }}/documents" enctype="multipart/form-data">
+      <label>Tipo de archivo
+        <select name="document_type"><option>Fuente</option><option>Plantilla Walmart</option></select>
+      </label>
+      <label>Archivo Excel (.xlsx)<input name="file" type="file" accept=".xlsx" required /></label>
+      <button type="submit">Adjuntar archivo</button>
+    </form>
+    {% if documents %}
+    <ul class="document-list">
+      {% for document in documents %}
+      <li><strong>{{ document.document_type }}</strong><span>{{ document.original_name }}</span><small>{{ document.uploaded_at }}</small></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Aún no hay archivos adjuntos.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Estado</h2>
+    <p>El estado permite que el equipo sepa en qué etapa está la campaña.</p>
+    <form class="status-form" method="post" action="/campaigns/{{ campaign.id }}/status">
+      <label>Estado actual
+        <select name="status">
+          {% for item in statuses %}<option value="{{ item }}" {% if item == campaign.status %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit">Actualizar estado</button>
+    </form>
+    <div class="next-step">
+      <h3>Siguiente implementación</h3>
+      <p>Cuando se defina el mapeo de esta marca, esta pantalla generará y validará el Excel final antes de enviarlo a Drive.</p>
+    </div>
+  </section>
+</div>
+{% endblock %}

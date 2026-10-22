@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Campañas | Planillas Walmart{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="eyebrow">Panel de trabajo</p>
+  <h1>Campañas de planillas</h1>
+  <p>Registra una campaña, adjunta sus archivos y deja todo listo para configurar la generación de la planilla Walmart.</p>
+</section>
+
+<section class="card">
+  <h2>Nueva campaña</h2>
+  <form class="form-grid" method="post" action="/campaigns">
+    <label>Nombre de la campaña<input name="name" placeholder="Ripholia 15% - Octubre" required /></label>
+    <label>Marca<input name="brand" placeholder="Ripholia" required /></label>
+    <label>Descuento<input name="discount" placeholder="15%" required /></label>
+    <button type="submit">Crear campaña</button>
+  </form>
+</section>
+
+<section class="section-heading">
+  <div><p class="eyebrow">Seguimiento</p><h2>Campañas registradas</h2></div>
+</section>
+
+{% if campaigns %}
+<div class="campaign-grid">
+  {% for campaign in campaigns %}
+  <a class="campaign-card" href="/campaigns/{{ campaign.id }}">
+    <div class="campaign-card__top"><span class="badge">{{ campaign.status }}</span><span>#{{ campaign.id }}</span></div>
+    <h3>{{ campaign.name }}</h3>
+    <p>{{ campaign.brand }} · {{ campaign.discount }}</p>
+    <small>Creada: {{ campaign.created_at }}</small>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>Aún no hay campañas</h3><p>Crea la primera para registrar los archivos fuente y la plantilla Walmart.</p></div>
+{% endif %}
+{% endblock %}

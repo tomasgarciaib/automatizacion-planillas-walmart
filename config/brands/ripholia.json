@@ -1,0 +1,13 @@
+{
+  "brand": "Ripholia",
+  "status": "pending_mapping",
+  "notes": "La configuración real se completa al validar una planilla fuente y una plantilla Walmart correctas.",
+  "source": {
+    "workbook_type": "Excel o Google Sheets exportado a Excel",
+    "group_key": null
+  },
+  "walmart_template": {
+    "sheet": "Vestuario",
+    "data_start_row": null
+  }
+}
