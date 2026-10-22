@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Productos | Planillas Walmart{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="eyebrow">Fuente de trabajo</p>
+  <h1>Productos pendientes de preparar</h1>
+  <p>Elige un producto desde la hoja compartida. La aplicación toma sus SKU, precio, medidas, peso y tallas para completar la plantilla de Walmart.</p>
+  <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Abrir la hoja de productos en Drive</a></p>
+</section>
+
+{% if source_error %}
+<section class="notice notice-error">
+  <strong>No se pudo leer Drive.</strong> {{ source_error }}
+</section>
+{% else %}
+<section class="card search-card">
+  <form class="search-form" method="get" action="/">
+    <label for="q">Buscar por SKU, descripción o marca</label>
+    <div><input id="q" name="q" value="{{ query }}" placeholder="Por ejemplo: L-569-14" /><button type="submit">Buscar</button></div>
+  </form>
+</section>
+
+<section class="section-heading">
+  <div>
+    <p class="eyebrow">{{ products|length }} productos</p>
+    <h2>Lista de productos</h2>
+  </div>
+</section>
+
+{% if products %}
+<div class="product-table-wrap">
+  <table class="product-table">
+    <thead>
+      <tr><th>Producto</th><th>Marca</th><th>Variantes</th><th>Precio final</th><th>Responsable</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for product in products %}
+      <tr>
+        <td><strong>{{ product.sku_base }}</strong><span>{{ product.description }}</span></td>
+        <td>{{ product.brand }}</td>
+        <td>{{ product.variants|length }}</td>
+        <td>${{ "{:,}".format(product.price|int).replace(",", ".") }}</td>
+        <td>{{ product.responsible or "Sin asignar" }}</td>
+        <td><a class="button-link" href="/products/{{ product.sku_base }}">Preparar planilla</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No hay coincidencias</h3><p>Prueba con otro SKU, descripción o marca.</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

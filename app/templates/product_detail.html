@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ product.sku_base }} | Planillas Walmart{% endblock %}
+{% block content %}
+<a class="back-link" href="/">← Volver a productos</a>
+
+<section class="intro product-intro">
+  <p class="eyebrow">Producto seleccionado desde Drive</p>
+  <h1>{{ product.sku_base }}</h1>
+  <p>{{ product.description }}</p>
+  <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Ver el producto en la hoja de Drive</a></p>
+</section>
+
+{% if message %}<section class="notice">{{ message }}</section>{% endif %}
+
+<section class="source-summary">
+  <article><span>Marca</span><strong>{{ product.brand }}</strong></article>
+  <article><span>Precio final</span><strong>{{ price_display }}</strong></article>
+  <article><span>Medidas</span><strong>{{ product.height_cm }} × {{ product.width_cm }} × {{ product.depth_cm }} cm</strong></article>
+  <article><span>Peso de envío</span><strong>{{ product.shipping_weight_kg }} kg</strong></article>
+  <article><span>Responsable</span><strong>{{ product.responsible or "Sin asignar" }}</strong></article>
+</section>
+
+<section class="card">
+  <p class="eyebrow">Paso 1</p>
+  <h2>Variantes que se cargarán</h2>
+  <p>Estas filas se obtienen automáticamente de Drive. Se generará una fila por SKU.</p>
+  <div class="variants-list">
+    {% for variant in product.variants %}<span><strong>{{ variant.sku }}</strong> · Talla {{ variant.size }}</span>{% endfor %}
+  </div>
+</section>
+
+<section class="card template-card">
+  <p class="eyebrow">Paso 2</p>
+  <h2>Plantilla oficial de Walmart</h2>
+  {% if template %}
+  <p>Se usará <strong>{{ template.original_name }}</strong>, cargada el {{ template.uploaded_at }}. Si Walmart entrega una versión nueva, súbela aquí antes de generar.</p>
+  {% else %}
+  <p class="required-note">Antes de generar, carga la plantilla oficial de la categoría Vestuario. La página conserva sus hojas técnicas, encabezados y validaciones.</p>
+  {% endif %}
+  <form class="upload-inline" method="post" action="/walmart-templates" enctype="multipart/form-data">
+    <input type="hidden" name="return_sku" value="{{ product.sku_base }}" />
+    <input name="file" type="file" accept=".xlsx" required />
+    <button type="submit">{% if template %}Reemplazar plantilla{% else %}Cargar plantilla Vestuario{% endif %}</button>
+  </form>
+</section>
+
+{% if template %}
+<form class="product-form" method="post" action="/products/{{ product.sku_base }}/generate">
+  <input type="hidden" name="template_id" value="{{ template.id }}" />
+  <section class="card">
+    <p class="eyebrow">Paso 3</p>
+    <h2>Datos que debes completar para este producto</h2>
+    <p>La aplicación no inventa los datos que hoy obtienen de Colab, WordPress o de los textos preparados para el producto. Completa estos campos y luego genera la planilla.</p>
+
+    <div class="form-section">
+      <label for="ean_codes">Códigos EAN</label>
+      <p class="field-help">En el Colab, cambia <code>number_of_codes</code> a <strong>{{ product.variants|length }}</strong>, ejecútalo y pega aquí los {{ product.variants|length }} códigos: uno por línea y en el mismo orden de las variantes de arriba.</p>
+      <textarea id="ean_codes" name="ean_codes" rows="{{ [product.variants|length + 1, 6]|max }}" required placeholder="Un EAN por línea"></textarea>
+    </div>
+
+    <div class="form-grid form-grid-three">
+      <label>URL imagen principal<input name="main_image_url" type="url" placeholder="https://..." required /></label>
+      <label>URL imagen secundaria<input name="image_2_url" type="url" placeholder="https://..." required /></label>
+      <label>URL imagen secundaria 1<input name="image_3_url" type="url" placeholder="https://..." required /></label>
+    </div>
+    <p class="field-help">Busca el SKU base en WordPress. Usa imagen 1 como principal, imagen 2 como secundaria e imagen 3 como secundaria 1.</p>
+
+    <div class="form-grid form-grid-two">
+      <label>Descripción larga<textarea name="long_description" rows="6" required></textarea></label>
+      <label>Descripción corta<textarea name="short_description" rows="6" required></textarea></label>
+      <label>Material<textarea name="material" rows="3" required></textarea></label>
+      <label>Características<textarea name="features" rows="3" required></textarea></label>
+      <label>Palabras clave<textarea name="keywords" rows="3" required></textarea></label>
+      <label>Texto de garantía<textarea name="warranty_text" rows="3" required></textarea></label>
+      <label class="span-all">Condiciones de la garantía<textarea name="warranty_condition" rows="5" required></textarea></label>
+    </div>
+
+    <div class="form-grid form-grid-three">
+      <label>Género<select name="gender" required><option selected>Mujer</option><option>Hombre</option><option>Unisex</option></select></label>
+      <label>Color<input name="color" value="{{ product.suggested_color }}" required /></label>
+      <label>Grupo etario<input value="Adulto" disabled /><span class="field-help">Se completa automáticamente.</span></label>
+    </div>
+    <p class="field-help">Condición: Nuevo. Garantía proporcionada por el vendedor: Garantia del Vendedor. Duración: 6 meses. Modelo e ID de grupo variante: {{ product.sku_base }}. Atributos: Color y Talla de ropa.</p>
+  </section>
+
+  <section class="generate-bar">
+    <div><strong>Resultado:</strong><span>Una planilla con {{ product.variants|length }} filas, lista para revisar y subir a Drive.</span></div>
+    <button type="submit">Generar planilla Walmart</button>
+  </section>
+</form>
+{% endif %}
+
+<section class="card outputs-card">
+  <p class="eyebrow">Planillas generadas</p>
+  <h2>Descargas de {{ product.sku_base }}</h2>
+  {% if outputs %}
+  <ul class="document-list">
+    {% for output in outputs %}<li><span>{{ output.original_name }}</span><small>{{ output.created_at }}</small><a href="/product-outputs/{{ output.id }}/download">Descargar</a></li>{% endfor %}
+  </ul>
+  {% else %}<p class="muted">Todavía no hay planillas generadas para este producto.</p>{% endif %}
+</section>
+{% endblock %}

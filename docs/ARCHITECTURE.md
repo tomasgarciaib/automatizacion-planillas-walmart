@@ -2,10 +2,7 @@
 
 ## Primera versión
 
-La aplicación registra campañas y recibe dos documentos por campaña:
-
-1. Planilla fuente de productos y precios.
-2. Plantilla oficial de Walmart.
+La aplicación lee una hoja fuente de productos de Google Sheets y organiza el trabajo por SKU base. Para cada producto, recibe una plantilla oficial de Walmart y genera un archivo por sus variantes.
 
 La base de datos SQLite y los archivos locales se usan solo durante el desarrollo. No se debe publicar esta configuración tal cual para el equipo remoto.
 
@@ -28,7 +25,7 @@ La base de datos SQLite y los archivos locales se usan solo durante el desarroll
 
 ## Fases
 
-1. Fundaciones: campañas, archivos, configuración por marca y pruebas.
+1. Fundaciones: productos desde Drive, plantilla, configuración por marca y pruebas.
 2. Generador Excel: mapeo, validaciones y archivo Walmart final.
 3. Drive y WordPress: lectura/escritura autorizada y URLs de imágenes.
 4. IA opcional: generación revisable de textos por producto.

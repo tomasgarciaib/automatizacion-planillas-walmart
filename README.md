@@ -4,9 +4,11 @@ Aplicación web interna para preparar, validar y organizar planillas de producto
 
 ## Estado actual
 
-La primera función disponible permite adjuntar una plantilla oficial de Walmart y crear una copia limpia para comenzar una carga nueva. La copia conserva la estructura técnica del archivo y elimina únicamente los datos de productos desde la fila 10 de la hoja `Vestuario`.
+La aplicación empieza desde la hoja compartida de productos de Drive. Cada integrante busca un SKU base, abre su ficha y genera una planilla de Walmart por producto con una fila por variante.
 
-Esta versión todavía no usa IA, no completa productos desde la planilla fuente, no se conecta con Google Drive, WordPress ni carga archivos en Walmart. Es una base de trabajo local para validar el flujo con el equipo.
+Para la categoría `Vestuario`, la aplicación completa automáticamente desde Drive los SKU, nombre, marca, precio, dimensiones, peso, tallas, modelo e identificadores de variantes. Conserva las hojas, encabezados, validaciones y formato de la plantilla oficial de Walmart.
+
+Los EAN, URLs de WordPress y textos específicos del producto siguen siendo revisados e ingresados por la persona responsable. La aplicación no inventa esos datos ni permite crear una planilla final si faltan.
 
 ## Ejecutar localmente
 
@@ -21,13 +23,17 @@ uvicorn app.main:app --reload
 
 Abre `http://127.0.0.1:8000` en el navegador.
 
-## Prueba con RIP-2451
+## Prueba con L-569-14
 
-1. Crea una campaña de prueba.
-2. Adjunta `RIP-2451.xlsx` como **Plantilla Walmart**.
-3. Pulsa **Crear plantilla limpia**.
-4. Descarga el archivo generado desde la lista de documentos.
-5. Completa la copia descargada. No modifiques las filas de instrucciones ni la hoja técnica oculta.
+1. Abre la página inicial y busca `L-569-14`.
+2. Pulsa **Preparar planilla**.
+3. Si es la primera vez, carga una copia vigente de la plantilla oficial de Walmart para `Vestuario`, por ejemplo `RIP-2451.xlsx`.
+4. En el Colab de EAN, configura `number_of_codes` con `5` y pega los cinco códigos resultantes, uno por línea.
+5. Copia desde WordPress las tres URLs de imágenes y completa los textos específicos del producto.
+6. Revisa los datos obtenidos de Drive y pulsa **Generar planilla Walmart**.
+7. Descarga el resultado y revísalo antes de subirlo a Drive.
+
+La configuración de la hoja fuente puede cambiarse con `SOURCE_SHEET_CSV_URL` y `SOURCE_SHEET_WEB_URL` en `.env`.
 
 Lee la guía completa en [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

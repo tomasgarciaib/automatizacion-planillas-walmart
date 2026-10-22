@@ -10,6 +10,16 @@ class Settings(BaseSettings):
     app_env: str = "development"
     data_dir: Path = Path("data")
     max_upload_mb: int = 25
+    source_sheet_csv_url: str = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1DAICEPsph-ORFQquheCFOlLSjMUgwyqN/gviz/tq?"
+        "tqx=out:csv&gid=1469600269"
+    )
+    source_sheet_web_url: str = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1DAICEPsph-ORFQquheCFOlLSjMUgwyqN/edit?"
+        "gid=1469600269#gid=1469600269"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

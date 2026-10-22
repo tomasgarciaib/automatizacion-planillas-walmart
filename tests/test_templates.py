@@ -1,8 +1,9 @@
 import zipfile
+from decimal import Decimal
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from app.services.templates import create_clean_template
+from app.services.templates import create_clean_template, create_filled_product_template
 
 
 SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -42,6 +43,18 @@ def _cell_contents(sheet_xml: bytes, reference: str) -> list[str]:
     return [child.tag for child in cell]
 
 
+def _cell_text(sheet_xml: bytes, reference: str) -> str | None:
+    root = ET.fromstring(sheet_xml)
+    cell = root.find(f".//{{{SPREADSHEET_NS}}}c[@r='{reference}']")
+    if cell is None:
+        return None
+    text = cell.find(f".//{{{SPREADSHEET_NS}}}t")
+    if text is not None:
+        return text.text
+    value = cell.find(f"{{{SPREADSHEET_NS}}}v")
+    return value.text if value is not None else None
+
+
 def test_clean_template_clears_product_rows_and_preserves_other_parts(tmp_path: Path):
     source = tmp_path / "source.xlsx"
     output = tmp_path / "clean.xlsx"
@@ -62,3 +75,34 @@ def test_clean_template_clears_product_rows_and_preserves_other_parts(tmp_path: 
     assert _cell_contents(clean_sheet, "E10") == []
     assert _cell_contents(clean_sheet, "D11") == []
     assert b"validation-preserved" in clean_sheet
+
+
+def test_fill_product_template_writes_rows_and_preserves_hidden_sheet(tmp_path: Path):
+    source = tmp_path / "source.xlsx"
+    output = tmp_path / "filled.xlsx"
+    _write_minimal_walmart_workbook(source)
+
+    result = create_filled_product_template(
+        source,
+        output,
+        rows=[
+            {"D": "L-RIP-569-14-XS", "E": "EAN", "F": "7801234567890", "I": Decimal("31790"), "FB": "Sí"},
+            {"D": "L-RIP-569-14-S", "E": "EAN", "F": "7801234567891", "I": Decimal("31790"), "FB": "No"},
+        ],
+    )
+
+    assert result.filled_rows == 2
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(output) as filled:
+        assert original.read("xl/workbook.xml") == filled.read("xl/workbook.xml")
+        assert original.read("xl/worksheets/sheet1.xml") == filled.read(
+            "xl/worksheets/sheet1.xml"
+        )
+        filled_sheet = filled.read("xl/worksheets/sheet2.xml")
+
+    assert _cell_text(filled_sheet, "D10") == "L-RIP-569-14-XS"
+    assert _cell_text(filled_sheet, "F10") == "7801234567890"
+    assert _cell_text(filled_sheet, "I10") == "31790"
+    assert _cell_text(filled_sheet, "FB10") == "Sí"
+    assert _cell_text(filled_sheet, "D11") == "L-RIP-569-14-S"
+    assert _cell_text(filled_sheet, "FB11") == "No"
+    assert b"validation-preserved" in filled_sheet

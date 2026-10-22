@@ -2,27 +2,29 @@
 
 ## Qué hace hoy el software
 
-La aplicación organiza una campaña y permite preparar una plantilla limpia de Walmart. Esta es la primera etapa antes de automatizar el llenado con la planilla fuente, las imágenes y Google Drive.
+La aplicación lee los productos desde la hoja de Drive configurada, permite escoger un SKU base y genera una planilla de Walmart con una fila por cada talla o variante del producto.
 
-La copia limpia conserva el archivo oficial, sus hojas internas, validaciones, encabezados e instrucciones. Solo borra los datos de producto de la hoja `Vestuario` desde la fila 10.
+Para `Vestuario`, completa automáticamente los SKU, nombre, marca, precio, medidas, peso, país de origen, fabricante, cantidad, unidad, modelo, grupo de variantes y tallas. Conserva las hojas internas, validaciones, encabezados e instrucciones de Walmart.
 
 ## Antes de comenzar
 
 - Usa siempre una copia oficial y vigente descargada desde Walmart.
 - Guarda la plantilla original sin modificar.
 - No subas planillas reales al repositorio de GitHub.
-- Durante este piloto la aplicación es local: las campañas de un computador no aparecen en el computador de otro compañero. La vista compartida llegará cuando se despliegue el sistema y se conecte a Drive.
+- Durante este piloto la aplicación es local: las planillas generadas en un computador no aparecen en el computador de otro compañero. La vista compartida llegará cuando se despliegue el sistema.
 
-## Crear una plantilla limpia con RIP-2451
+## Preparar L-569-14
 
 1. Inicia la aplicación y abre `http://127.0.0.1:8000`.
-2. Pulsa `Nueva campaña` e ingresa un nombre claro, por ejemplo `Ripholia 15% - prueba`.
-3. Indica la marca y el descuento.
-4. En `Archivos de trabajo`, selecciona `Plantilla Walmart`.
-5. Adjunta `RIP-2451.xlsx` y pulsa `Adjuntar archivo`.
-6. Cuando aparezca en la lista, pulsa `Crear plantilla limpia`.
-7. Descarga el documento de tipo `Plantilla limpia`.
-8. Abre solo la copia descargada y verifica que la hoja `Vestuario` conserve los encabezados y que las filas de producto estén vacías.
+2. Busca `L-569-14` y pulsa `Preparar planilla`.
+3. Confirma que aparezcan las cinco variantes: XS, S, M, L y XL.
+4. Si todavía no hay una plantilla cargada, adjunta la plantilla oficial vigente de `Vestuario`, por ejemplo `RIP-2451.xlsx`.
+5. Abre el Colab de EAN. Cambia `number_of_codes` a `5`, ejecútalo y pega los cinco códigos en el mismo orden de las variantes.
+6. En WordPress, busca el SKU base. Copia la imagen 1 como principal, la imagen 2 como secundaria y la imagen 3 como secundaria 1.
+7. Completa descripción larga, descripción corta, material, características, palabras clave y los dos textos de garantía que corresponden a este producto.
+8. Revisa género y color. El color se propone desde la descripción de Drive, por lo que debe confirmarse antes de generar.
+9. Pulsa `Generar planilla Walmart` y descarga el resultado.
+10. Abre el archivo descargado y revísalo antes de subirlo a Drive.
 
 ## Qué no se debe modificar
 
@@ -31,14 +33,21 @@ La copia limpia conserva el archivo oficial, sus hojas internas, validaciones, e
 - No hagas visible, edites ni elimines `Hidden_clothing_other`.
 - No reemplaces la plantilla original por la copia de trabajo.
 
+## Datos que requieren revisión humana
+
+- Los EAN se generan en el Colab aprobado por el equipo. Nunca se inventan ni se reutilizan.
+- Las URLs deben venir de las imágenes correctas de WordPress.
+- Los textos deben describir el producto concreto. No reutilices una garantía o material de otro producto.
+- La primera variante se marca como `Sí` y las demás como `No` en `Variante principal`.
+
 ## Cuando aparezca una nueva plantilla de Walmart
 
 Las plantillas pueden variar por categoría. Antes de automatizar una nueva, sube una plantilla vacía oficial y un ejemplo correcto ya completado. El equipo técnico comparará sus campos y agregará una configuración específica para esa categoría.
 
 ## Próximas etapas
 
-1. Leer datos desde una planilla fuente por marca y descuento.
-2. Validar SKU, medidas, precios y campos obligatorios.
-3. Crear la planilla final con los datos del producto.
-4. Guardar el resultado en Google Drive y actualizar estados.
-5. Agregar WordPress, generación asistida de textos y carga en Walmart.
+1. Registrar automáticamente en la hoja de Drive que la planilla está lista.
+2. Consultar WordPress para proponer las imágenes del SKU.
+3. Guardar el resultado en Google Drive y actualizar estados.
+4. Agregar generación asistida de textos con revisión humana.
+5. Cargar en los perfiles Abizi, Ofertas y Crazy y registrar errores de Walmart.
