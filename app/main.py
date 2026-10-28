@@ -17,7 +17,9 @@ from app.services.campaigns import (
     list_campaigns,
     update_status,
 )
+from app.services.ean import generate_ean13_massive, validate_ean13
 from app.services.files import save_upload
+from app.services.image_urls import ImageUrlsError, fetch_image_urls
 from app.services.source_products import (
     ProductVariant,
     SourceProduct,
@@ -38,7 +40,17 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 UPLOAD_DOCUMENT_TYPES = {"Fuente", "Plantilla Walmart"}
 GENERATED_DOCUMENT_TYPE = "Plantilla limpia"
-EAN_PATTERN = re.compile(r"^\d{8,14}$")
+RIPHOLIA_SKU_MARKER = "-RIP-"
+WARRANTY_TEXT = "Garantia del Vendedor"
+WARRANTY_CONDITION = (
+    "La garantía aplica si el producto se usa solamente para fines personales, no comerciales. "
+    "Bajo esta condición, el pantalón clínico cuenta con una garantía legal de 6 meses "
+    "(según la ley chilena) ante fallas de fábrica como costuras descosidas, cierres o "
+    "broches defectuosos, dando derecho a cambio o devolución del dinero. Esta garantía "
+    "no cubre el desgaste natural por el uso diario, daños por mal lavado (como manchas "
+    "de cloro), quemaduras de plancha, enganches accidentales ni el uso de la prenda para "
+    "fines comerciales o de lucro"
+)
 
 
 @asynccontextmanager
@@ -64,6 +76,17 @@ def app_settings() -> Settings:
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/ean-codes")
+def generate_ean_codes(number_of_codes: int = 1) -> dict[str, list[str]]:
+    """Genera EAN-13 únicos para mostrarlos en el formulario del producto."""
+    if number_of_codes < 1 or number_of_codes > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="number_of_codes debe estar entre 1 y 100",
+        )
+    return {"codes": generate_ean13_massive(number_of_codes, unique=True)}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -123,6 +146,27 @@ def _format_price(value: object) -> str:
     return f"${int(value):,}".replace(",", ".")
 
 
+def _format_walmart_parent_sku(sku_base: str) -> str:
+    """Agrega el identificador RIP al SKU padre usado por Walmart."""
+    normalized = sku_base.strip()
+    if RIPHOLIA_SKU_MARKER in normalized.upper():
+        return normalized
+    prefix, separator, suffix = normalized.partition("-")
+    if not separator or not prefix or not suffix:
+        return normalized
+    return f"{prefix}{RIPHOLIA_SKU_MARKER}{suffix}"
+
+
+def _image_sheet_sku(sku_base: str) -> str:
+    """Convierte L-400-2 o L-RIP-400-2 al SKU numérico de la hoja de imágenes."""
+    parts = sku_base.strip().split("-")
+    if len(parts) >= 3 and parts[1].casefold() == "rip":
+        return "-".join(parts[2:])
+    if len(parts) >= 2 and parts[0].casefold() == "l":
+        return "-".join(parts[1:])
+    return sku_base.strip()
+
+
 def _get_source_product(
     settings: Settings, sku_ml: str
 ) -> tuple[SourceProduct, ProductVariant]:
@@ -137,6 +181,7 @@ def _get_source_product(
 def _build_product_rows(
     product: SourceProduct,
     *,
+    product_name: str,
     ean_codes: list[str],
     main_image_url: str,
     image_2_url: str,
@@ -153,13 +198,14 @@ def _build_product_rows(
 ) -> list[dict[str, object]]:
     """Convierte un producto de Drive al mapeo de columnas de Vestuario."""
     rows: list[dict[str, object]] = []
+    walmart_parent_sku = _format_walmart_parent_sku(product.sku_base)
     for index, variant in enumerate(product.variants):
         rows.append(
             {
                 "D": variant.sku,
                 "E": "EAN",
                 "F": ean_codes[index],
-                "G": product.description,
+                "G": product_name,
                 "H": product.brand,
                 "I": product.price,
                 "J": product.height_cm,
@@ -186,12 +232,12 @@ def _build_product_rows(
                 "AE": gender,
                 "AF": color,
                 "AG": material,
-                "AH": product.sku_base,
+                "AH": walmart_parent_sku,
                 "AI": features,
                 "AJ": keywords,
                 "AR": variant.size,
                 "AS": "Adulto",
-                "EY": product.sku_base,
+                "EY": walmart_parent_sku,
                 "EZ": "Color",
                 "FA": "Talla de ropa",
                 "FB": "Sí" if index == 0 else "No",
@@ -226,6 +272,8 @@ def sku_ml_detail(
         {
             "product": product,
             "selected_variant": selected_variant,
+            "walmart_parent_sku": _format_walmart_parent_sku(product.sku_base),
+            "image_sheet_sku": _image_sheet_sku(product.sku_base),
             "template": template,
             "outputs": outputs,
             "message": message,
@@ -290,10 +338,10 @@ async def upload_walmart_template(
 def generate_product_template(
     sku_ml: str,
     template_id: int = Form(...),
+    product_name: str = Form(...),
+    image_sheet_sku: str = Form(...),
+    number_of_codes: int = Form(...),
     ean_codes: str = Form(...),
-    main_image_url: str = Form(...),
-    image_2_url: str = Form(...),
-    image_3_url: str = Form(...),
     long_description: str = Form(...),
     short_description: str = Form(...),
     warranty_text: str = Form(...),
@@ -306,10 +354,15 @@ def generate_product_template(
     settings: Settings = Depends(app_settings),
 ):
     product, _ = _get_source_product(settings, sku_ml)
+    warranty_text = WARRANTY_TEXT
+    warranty_condition = WARRANTY_CONDITION
+    try:
+        image_urls = fetch_image_urls(settings.image_sheet_csv_url, image_sheet_sku)
+    except ImageUrlsError as error:
+        return RedirectResponse(_sku_ml_url(sku_ml, str(error)), status_code=303)
+
     entered_values = {
-        "URL imagen principal": main_image_url,
-        "URL imagen secundaria": image_2_url,
-        "URL imagen secundaria 1": image_3_url,
+        "Nombre del producto": product_name,
         "Descripción larga": long_description,
         "Descripción corta": short_description,
         "Texto de garantía": warranty_text,
@@ -328,6 +381,22 @@ def generate_product_template(
         )
 
     codes = [line.strip() for line in ean_codes.splitlines() if line.strip()]
+    if number_of_codes != len(product.variants):
+        return RedirectResponse(
+            _sku_ml_url(
+                sku_ml,
+                f"La cantidad de EAN se calcula automáticamente: este SKU padre tiene {len(product.variants)} SKU hijos.",
+            ),
+            status_code=303,
+        )
+    if number_of_codes != len(codes):
+        return RedirectResponse(
+            _sku_ml_url(
+                sku_ml,
+                f"number_of_codes indica {number_of_codes}, pero se recibieron {len(codes)} códigos.",
+            ),
+            status_code=303,
+        )
     if len(codes) != len(product.variants):
         return RedirectResponse(
             _sku_ml_url(
@@ -336,13 +405,13 @@ def generate_product_template(
             ),
             status_code=303,
         )
-    if len(set(codes)) != len(codes) or any(not EAN_PATTERN.fullmatch(code) for code in codes):
+    if len(set(codes)) != len(codes) or any(not validate_ean13(code) for code in codes):
         return RedirectResponse(
-            _sku_ml_url(sku_ml, "Los EAN deben ser códigos numéricos únicos de 8 a 14 dígitos."),
+            _sku_ml_url(sku_ml, "Los códigos deben ser EAN-13 válidos y únicos."),
             status_code=303,
         )
-    image_urls = (main_image_url, image_2_url, image_3_url)
-    if any(not value.strip().lower().startswith(("https://", "http://")) for value in image_urls):
+    image_url_values = (image_urls.main, image_urls.secondary, image_urls.secondary_1)
+    if any(not value.lower().startswith(("https://", "http://")) for value in image_url_values):
         return RedirectResponse(
             _sku_ml_url(sku_ml, "Las tres imágenes deben tener una URL que comience con http:// o https://."),
             status_code=303,
@@ -375,10 +444,11 @@ def generate_product_template(
                 output_path,
                 rows=_build_product_rows(
                     product,
+                    product_name=product_name.strip(),
                     ean_codes=codes,
-                    main_image_url=main_image_url.strip(),
-                    image_2_url=image_2_url.strip(),
-                    image_3_url=image_3_url.strip(),
+                    main_image_url=image_urls.main,
+                    image_2_url=image_urls.secondary,
+                    image_3_url=image_urls.secondary_1,
                     long_description=long_description.strip(),
                     short_description=short_description.strip(),
                     warranty_text=warranty_text.strip(),

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
         "1DAICEPsph-ORFQquheCFOlLSjMUgwyqN/edit?"
         "gid=1469600269#gid=1469600269"
     )
+    image_sheet_csv_url: str = (
+        "https://docs.google.com/spreadsheets/d/"
+        "1QJ0c09aTCYljqNZOZM6SRGzYMag1QsNKG7N1LyJGaKg/export?"
+        "format=csv&gid=0"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
