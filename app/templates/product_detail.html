@@ -7,6 +7,7 @@
   <p class="eyebrow">SKU Base seleccionado</p>
   <h1>{{ product.sku_base }}</h1>
   <p>{{ product.description }}</p>
+  <p class="field-help"><strong>SKU padre en Walmart:</strong> {{ walmart_parent_sku }}</p>
   <p class="field-help">Se incluirán todos sus SKU ML en la misma planilla.</p>
   <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Ver el producto en la hoja de Drive</a></p>
 </section>
@@ -48,28 +49,32 @@
     <p>La aplicación no inventa los datos que hoy obtienen de Colab, WordPress o de los textos preparados para el producto. Completa estos campos y luego genera la planilla.</p>
 
     <div class="form-section">
-      <label for="ean_codes">Códigos EAN</label>
-      <p class="field-help">En el Colab, cambia <code>number_of_codes</code> a <strong>{{ product.variants|length }}</strong>, ejecútalo y pega aquí los {{ product.variants|length }} códigos: uno por línea y en el mismo orden de las variantes de arriba.</p>
-      <textarea id="ean_codes" name="ean_codes" rows="{{ [product.variants|length + 1, 6]|max }}" required placeholder="Un EAN por línea"></textarea>
+      <label for="number_of_codes">Cantidad de codigos EAN-13 (automatica)</label>
+      <input id="number_of_codes" name="number_of_codes" type="number" min="1" max="100" value="{{ product.variants|length }}" readonly required />
+      <p class="field-help">Se calcula segun los SKU hijos: {{ product.variants|length }} codigos para {{ product.variants|length }} variantes.</p>
+      <label for="ean_codes">Codigos generados</label>
+      <textarea id="ean_codes" name="ean_codes" rows="{{ [product.variants|length + 1, 6]|max }}" required readonly placeholder="Generando EAN-13"></textarea>
+      <p id="ean-status" class="field-help"></p>
     </div>
 
-    <div class="form-grid form-grid-three">
-      <label>URL imagen principal<input name="main_image_url" type="url" placeholder="https://..." required /></label>
-      <label>URL imagen secundaria<input name="image_2_url" type="url" placeholder="https://..." required /></label>
-      <label>URL imagen secundaria 1<input name="image_3_url" type="url" placeholder="https://..." required /></label>
+    <div class="form-section">
+      <label for="product_name">Nombre del producto</label>
+      <input id="product_name" name="product_name" value="{{ product.description }}" required />
     </div>
-    <p class="field-help">Busca el SKU base en WordPress. Usa imagen 1 como principal, imagen 2 como secundaria e imagen 3 como secundaria 1.</p>
 
+    <div class="form-section">
+      <label for="image_sheet_sku">SKU padre para buscar imagenes</label>
+      <input id="image_sheet_sku" name="image_sheet_sku" value="{{ image_sheet_sku }}" required />
+      <p class="field-help">La aplicacion buscara las tres imagenes en la hoja compartida.</p>
+    </div>
     <div class="form-grid form-grid-two">
       <label>Descripción larga<textarea name="long_description" rows="6" required></textarea></label>
       <label>Descripción corta<textarea name="short_description" rows="6" required></textarea></label>
       <label>Material<textarea name="material" rows="3" required></textarea></label>
       <label>Características<textarea name="features" rows="3" required></textarea></label>
       <label>Palabras clave<textarea name="keywords" rows="3" required></textarea></label>
-      <label>Texto de garantía<textarea name="warranty_text" rows="3" required></textarea></label>
-      <label class="span-all">Condiciones de la garantía<textarea name="warranty_condition" rows="5" required></textarea></label>
+      <p class="field-help span-all"><strong>Garantia fija:</strong> Se aplica automaticamente a todas las planillas generadas.</p>
     </div>
-
     <div class="form-grid form-grid-three">
       <label>Género<select name="gender" required><option selected>Mujer</option><option>Hombre</option><option>Unisex</option></select></label>
       <label>Color<input name="color" value="{{ product.suggested_color }}" required /></label>
@@ -82,7 +87,28 @@
     <div><strong>Resultado:</strong><span>Una planilla con {{ product.variants|length }} filas, lista para revisar y subir a Drive.</span></div>
     <button type="submit">Generar planilla Walmart</button>
   </section>
-</form>
+</form><script>
+  const eanCount = document.getElementById("number_of_codes");
+  const eanCodes = document.getElementById("ean_codes");
+  const eanStatus = document.getElementById("ean-status");
+
+  async function generateEanCodes() {
+    const count = Number(eanCount.value);
+    eanStatus.textContent = "Generando codigos...";
+    try {
+      const response = await fetch(`/ean-codes?number_of_codes=${count}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "No se pudieron generar los codigos.");
+      eanCodes.value = payload.codes.join("\n");
+      eanStatus.textContent = `${payload.codes.length} codigos EAN-13 generados.`;
+    } catch (error) {
+      eanCodes.value = "";
+      eanStatus.textContent = error.message;
+    }
+  }
+
+  generateEanCodes();
+</script>
 {% endif %}
 
 <section class="card outputs-card">

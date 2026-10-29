@@ -1,3 +1,4 @@
+import io
 import zipfile
 from decimal import Decimal
 from pathlib import Path
@@ -5,7 +6,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.database import get_connection, initialize_database
-from app.main import app, app_settings
+from app.main import _format_walmart_parent_sku, app, app_settings
+from app.services.ean import validate_ean13
+from app.services.image_urls import ProductImageUrls
 from app.services.source_products import ProductVariant, SourceProduct
 from app.settings import Settings
 
@@ -51,24 +54,38 @@ def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypa
     initialize_database(settings.database_path)
     product = _product()
     monkeypatch.setattr("app.main.fetch_products", lambda _url: [product])
+    monkeypatch.setattr(
+        "app.main.fetch_image_urls",
+        lambda _url, sku: ProductImageUrls(
+            sku_parent=sku,
+            main="https://example.com/imagen-1.jpg",
+            secondary="https://example.com/imagen-2.jpg",
+            secondary_1="https://example.com/imagen-3.jpg",
+        ),
+    )
     app.dependency_overrides[app_settings] = lambda: settings
     client = TestClient(app)
     try:
         detail = client.get("/sku-base/L-569-14")
         assert detail.status_code == 200
         assert "Pantalón Jogger" in detail.text
+        assert "generateEanCodes" in detail.text
+
+        ean_response = client.get("/ean-codes?number_of_codes=2")
+        assert ean_response.status_code == 200
+        ean_codes = ean_response.json()["codes"]
+        assert len(ean_codes) == len(set(ean_codes)) == 2
+        assert all(validate_ean13(code) for code in ean_codes)
 
         generated = client.post(
             "/sku-base/L-569-14/generate",
             data={
-                "ean_codes": "7801234567890\n7801234567891",
-                "main_image_url": "https://example.com/imagen-1.jpg",
-                "image_2_url": "https://example.com/imagen-2.jpg",
-                "image_3_url": "https://example.com/imagen-3.jpg",
+                "product_name": "Nombre modificado por el usuario",
+                "image_sheet_sku": "569-14",
+                "number_of_codes": "2",
+                "ean_codes": "\n".join(ean_codes),
                 "long_description": "Descripción larga de prueba.",
                 "short_description": "Descripción corta.",
-                "warranty_text": "Garantía del vendedor.",
-                "warranty_condition": "Condiciones de garantía de prueba.",
                 "gender": "Mujer",
                 "color": "Verde Esmeralda",
                 "material": "Poliéster.",
@@ -85,6 +102,15 @@ def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypa
         download = client.get(f"/product-outputs/{output['id']}/download")
         assert download.status_code == 200
         assert download.content[:2] == b"PK"
+        with zipfile.ZipFile(io.BytesIO(download.content)) as workbook:
+            sheet = workbook.read("xl/worksheets/sheet2.xml")
+        assert b"Nombre modificado por el usuario" in sheet
+        assert b"L-RIP-569-14" in sheet
     finally:
         client.close()
         app.dependency_overrides.clear()
+
+
+def test_walmart_parent_sku_adds_rip_without_duplicating_it():
+    assert _format_walmart_parent_sku("L-400-2") == "L-RIP-400-2"
+    assert _format_walmart_parent_sku("L-RIP-400-2") == "L-RIP-400-2"
