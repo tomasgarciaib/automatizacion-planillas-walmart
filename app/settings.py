@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         "1DAICEPsph-ORFQquheCFOlLSjMUgwyqN/edit?"
         "gid=1469600269#gid=1469600269"
     )
+    vestuario_template_path: Path = Path("assets/templates/plantilla-vestuario.xlsx")
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 

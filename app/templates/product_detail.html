@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ selected_variant.sku }} | Planillas Walmart{% endblock %}
+{% block title %}{{ product.sku_base }} | Planillas Walmart{% endblock %}
 {% block content %}
-<a class="back-link" href="/">← Volver a SKU ML pendientes</a>
+<a class="back-link" href="/">← Volver a SKU Base pendientes</a>
 
 <section class="intro product-intro">
-  <p class="eyebrow">SKU ML seleccionado</p>
-  <h1>{{ selected_variant.sku }}</h1>
+  <p class="eyebrow">SKU Base seleccionado</p>
+  <h1>{{ product.sku_base }}</h1>
   <p>{{ product.description }}</p>
-  <p class="field-help"><strong>SKU Base:</strong> {{ product.sku_base }}. Se incluirán todos sus SKU ML en la misma planilla.</p>
+  <p class="field-help">Se incluirán todos sus SKU ML en la misma planilla.</p>
   <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Ver el producto en la hoja de Drive</a></p>
 </section>
 
@@ -18,7 +18,7 @@
   <article><span>Precio final</span><strong>{{ price_display }}</strong></article>
   <article><span>Medidas</span><strong>{{ product.height_cm }} × {{ product.width_cm }} × {{ product.depth_cm }} cm</strong></article>
   <article><span>Peso de envío</span><strong>{{ product.shipping_weight_kg }} kg</strong></article>
-  <article><span>SKU ML elegido</span><strong>{{ selected_variant.sku }}</strong></article>
+  <article><span>SKU ML a crear</span><strong>{{ product.variants|length }}</strong></article>
 </section>
 
 <section class="card">
@@ -33,17 +33,15 @@
 <section class="card template-card">
   <p class="eyebrow">Plantilla de Vestuario</p>
   <h2>Plantilla fija de Walmart</h2>
-  {% if template %}
-  <p>Se usará automáticamente <strong>{{ template.original_name }}</strong>. Antes de cada generación se eliminan las filas anteriores y se completa una copia nueva.</p>
+  {% if template_ready %}
+  <p>Se usará automáticamente <strong>{{ template_name }}</strong>. Antes de cada generación se eliminan las filas anteriores y se completa una copia nueva.</p>
   {% else %}
-  <p class="required-note">Aún no hay una plantilla fija configurada. Un administrador debe cargar la plantilla oficial de Vestuario una sola vez.</p>
-  <p><a href="/configuracion/plantilla">Configurar plantilla de Vestuario</a></p>
+  <p class="required-note">No se encontró la plantilla fija de Vestuario. Contacta al administrador del sistema.</p>
   {% endif %}
 </section>
 
-{% if template %}
-<form class="product-form" method="post" action="/sku-ml/{{ selected_variant.sku }}/generate">
-  <input type="hidden" name="template_id" value="{{ template.id }}" />
+{% if template_ready %}
+<form class="product-form" method="post" action="/sku-base/{{ product.sku_base }}/generate">
   <section class="card">
     <p class="eyebrow">Datos por completar</p>
     <h2>Datos que debes completar para este producto</h2>

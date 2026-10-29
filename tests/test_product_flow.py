@@ -42,32 +42,25 @@ def _product() -> SourceProduct:
 
 
 def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypatch):
-    settings = Settings(data_dir=tmp_path / "data")
-    initialize_database(settings.database_path)
     source_template = tmp_path / "vestuario.xlsx"
     _write_template(source_template)
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        vestuario_template_path=source_template,
+    )
+    initialize_database(settings.database_path)
     product = _product()
     monkeypatch.setattr("app.main.fetch_products", lambda _url: [product])
     app.dependency_overrides[app_settings] = lambda: settings
     client = TestClient(app)
     try:
-        detail = client.get("/sku-ml/L-RIP-569-14-XS")
+        detail = client.get("/sku-base/L-569-14")
         assert detail.status_code == 200
         assert "Pantalón Jogger" in detail.text
 
-        with source_template.open("rb") as file:
-            upload = client.post(
-                "/walmart-templates",
-                data={"return_sku_ml": "L-RIP-569-14-XS"},
-                files={"file": ("vestuario.xlsx", file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-                follow_redirects=False,
-            )
-        assert upload.status_code == 303
-
         generated = client.post(
-            "/sku-ml/L-RIP-569-14-XS/generate",
+            "/sku-base/L-569-14/generate",
             data={
-                "template_id": "1",
                 "ean_codes": "7801234567890\n7801234567891",
                 "main_image_url": "https://example.com/imagen-1.jpg",
                 "image_2_url": "https://example.com/imagen-2.jpg",

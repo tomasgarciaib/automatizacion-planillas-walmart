@@ -3,8 +3,8 @@
 {% block content %}
 <section class="intro">
   <p class="eyebrow">Fuente de trabajo</p>
-  <h1>SKU ML sin asignar</h1>
-  <p>Elige un SKU ML pendiente. La aplicación encuentra su SKU Base y reúne automáticamente todos los SKU ML de ese mismo producto para crear una única planilla Walmart.</p>
+  <h1>SKU Base sin asignar</h1>
+  <p>Elige un SKU Base pendiente una sola vez. La aplicación reúne todos sus SKU ML y genera una única planilla Walmart, sin importar si tiene 4, 7 o 10 variantes.</p>
   <p class="source-link"><a href="{{ source_sheet_url }}" target="_blank" rel="noreferrer">Abrir la hoja de productos en Drive</a></p>
 </section>
 
@@ -17,40 +17,40 @@
   <form class="search-form" method="get" action="/">
     {% if show_all %}<input type="hidden" name="show_all" value="true" />{% endif %}
     <label for="q">Buscar por SKU Base, SKU ML, descripción o marca</label>
-    <div><input id="q" name="q" value="{{ query }}" placeholder="Por ejemplo: L-RIP-569-14-XS" /><button type="submit">Buscar</button></div>
+    <div><input id="q" name="q" value="{{ query }}" placeholder="Por ejemplo: L-2541" /><button type="submit">Buscar</button></div>
   </form>
   <p class="field-help">{% if show_all %}<a href="/">Ver solo SKU ML sin asignar</a>{% else %}<a href="/?show_all=true">Ver también SKU ML ya asignados</a>{% endif %}</p>
 </section>
 
 <section class="section-heading">
   <div>
-    <p class="eyebrow">{{ sku_items|length }} SKU ML</p>
-    <h2>{% if show_all %}Todos los SKU ML{% else %}Pendientes de asignación{% endif %}</h2>
+    <p class="eyebrow">{{ products|length }} productos</p>
+    <h2>{% if show_all %}Todos los SKU Base{% else %}Pendientes de asignación{% endif %}</h2>
   </div>
 </section>
 
-{% if sku_items %}
+{% if products %}
 <div class="product-table-wrap">
   <table class="product-table">
     <thead>
-      <tr><th>SKU Base</th><th>SKU ML</th><th>Talla</th><th>Producto</th><th>Responsable</th><th></th></tr>
+      <tr><th>SKU Base</th><th>SKU ML a crear</th><th>Producto</th><th>Marca</th><th>Responsable</th><th></th></tr>
     </thead>
     <tbody>
-    {% for item in sku_items %}
+    {% for product in products %}
       <tr>
-        <td><strong>{{ item.product.sku_base }}</strong></td>
-        <td><strong>{{ item.variant.sku }}</strong></td>
-        <td>{{ item.variant.size }}</td>
-        <td><span>{{ item.product.description }}</span></td>
-        <td>{{ item.product.responsible or "Sin asignar" }}</td>
-        <td><a class="button-link" href="/sku-ml/{{ item.variant.sku }}">Crear planilla</a></td>
+        <td><strong>{{ product.sku_base }}</strong></td>
+        <td>{{ product.variants|length }} SKU ML</td>
+        <td><span>{{ product.description }}</span></td>
+        <td>{{ product.brand }}</td>
+        <td>{{ product.responsible or "Sin asignar" }}</td>
+        <td><a class="button-link" href="/sku-base/{{ product.sku_base }}">Crear planilla</a></td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<div class="empty-state"><h3>No hay SKU ML pendientes</h3><p>Prueba buscando un SKU específico o muestra también los productos asignados.</p></div>
+<div class="empty-state"><h3>No hay SKU Base pendientes</h3><p>Prueba buscando un SKU específico o muestra también los productos asignados.</p></div>
 {% endif %}
 {% endif %}
 {% endblock %}
