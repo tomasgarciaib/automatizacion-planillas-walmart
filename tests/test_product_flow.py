@@ -90,6 +90,8 @@ def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypa
                 "warranty_condition": "Condiciones de garantía de prueba.",
                 "gender": "Mujer",
                 "color": "Verde Esmeralda",
+                "model": "MODELO-CUSTOM",
+                "variant_group_id": "GRUPO-CUSTOM",
                 "material": "Poliéster.",
                 "features": "Uso clínico.",
                 "keywords": "pantalón, clínico",
@@ -107,7 +109,8 @@ def test_product_flow_creates_downloadable_walmart_file(tmp_path: Path, monkeypa
         with zipfile.ZipFile(io.BytesIO(download.content)) as workbook:
             sheet = workbook.read("xl/worksheets/sheet2.xml")
         assert b"Nombre modificado por el usuario" in sheet
-        assert b"L-RIP-569-14" in sheet
+        assert b"MODELO-CUSTOM" in sheet
+        assert b"GRUPO-CUSTOM" in sheet
     finally:
         client.close()
         app.dependency_overrides.clear()

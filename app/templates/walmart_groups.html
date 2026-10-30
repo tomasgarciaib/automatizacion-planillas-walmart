@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Grupos Walmart | Planillas{% endblock %}
+{% block content %}
+<section class="intro">
+  <p class="eyebrow">Walmart</p>
+  <h1>Grupos de trabajo</h1>
+  <p>Selecciona un grupo para ver sus SKU ML sin asignar.</p>
+</section>
+
+{% if source_error %}
+<section class="notice notice-error">
+  <strong>No se pudo leer Drive.</strong> {{ source_error }}
+</section>
+{% else %}
+<section class="work-groups" aria-label="Grupos de SKU ML">
+  <a class="work-group-button" href="/walmart/ripholia-duplicados-35">
+    <span>
+      <strong>Ripholia duplicados 35</strong>
+      <small>SKU ML sin asignar</small>
+    </span>
+    <em>{{ pending_count }} SKU ML</em>
+  </a>
+  <a class="work-group-button" href="/walmart/ripholia-15">
+    <span>
+      <strong>Ripholia 15</strong>
+      <small>SKU ML sin asignar</small>
+    </span>
+    <em>{{ ripholia_15_pending_count }} SKU ML</em>
+  </a>
+</section>
+{% endif %}
+{% endblock %}

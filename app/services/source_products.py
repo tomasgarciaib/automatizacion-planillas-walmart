@@ -33,6 +33,9 @@ class SourceProduct:
     depth_cm: Decimal
     shipping_weight_kg: Decimal
     variants: tuple[ProductVariant, ...]
+    abizi_status: str = ""
+    crazy_status: str = ""
+    ofertas_status: str = ""
 
     @property
     def suggested_color(self) -> str:
@@ -47,6 +50,9 @@ class SourceProduct:
 # campos no se deducen de los encabezados vacíos del CSV.
 RESPONSIBLE = 0
 DRIVE_STATUS = 1
+ABIZI_STATUS = 2
+CRAZY_STATUS = 3
+OFERTAS_STATUS = 4
 SKU_BASE = 5
 SKU = 6
 DESCRIPTION = 7
@@ -79,11 +85,25 @@ def _parse_number(value: str, field_name: str) -> Decimal:
         ) from error
 
 
-def _group_products(rows: Iterable[list[str]]) -> list[SourceProduct]:
+def _group_products(
+    rows: Iterable[list[str]], columns: dict[str, int] | None = None
+) -> list[SourceProduct]:
+    columns = columns or {}
+    sku_base_position = columns.get("sku_base", SKU_BASE)
+    sku_position = columns.get("sku", SKU)
+    description_position = columns.get("description", DESCRIPTION)
+    brand_position = columns.get("brand", BRAND)
+    size_position = columns.get("size", SIZE)
+    height_position = columns.get("height", HEIGHT)
+    width_position = columns.get("width", WIDTH)
+    depth_position = columns.get("depth", DEPTH)
+    shipping_weight_position = columns.get("shipping_weight", globals()["SHIPPING_WEIGHT"])
+    final_price_position = columns.get("final_price", FINAL_PRICE)
+    SHIPPING_WEIGHT = shipping_weight_position
     grouped: dict[str, list[list[str]]] = {}
     for row in rows:
-        sku_base = _value(row, SKU_BASE)
-        sku = _value(row, SKU)
+        sku_base = _value(row, sku_base_position)
+        sku = _value(row, sku_position)
         if not sku_base or not sku:
             continue
         grouped.setdefault(sku_base, []).append(row)
@@ -95,7 +115,17 @@ def _group_products(rows: Iterable[list[str]]) -> list[SourceProduct]:
             for row in product_rows
             if all(
                 _value(row, position)
-                for position in (SKU, DESCRIPTION, BRAND, SIZE, HEIGHT, WIDTH, DEPTH, SHIPPING_WEIGHT, FINAL_PRICE)
+                for position in (
+                    sku_position,
+                    description_position,
+                    brand_position,
+                    size_position,
+                    height_position,
+                    width_position,
+                    depth_position,
+                    shipping_weight_position,
+                    final_price_position,
+                )
             )
         ]
         if not complete_rows:
@@ -103,24 +133,27 @@ def _group_products(rows: Iterable[list[str]]) -> list[SourceProduct]:
 
         first = complete_rows[0]
         variants = tuple(
-            ProductVariant(sku=_value(row, SKU), size=_value(row, SIZE))
+            ProductVariant(sku=_value(row, sku_position), size=_value(row, size_position))
             for row in complete_rows
         )
         products.append(
             SourceProduct(
                 sku_base=sku_base,
-                description=_value(first, DESCRIPTION),
-                brand=_value(first, BRAND),
+                description=_value(first, description_position),
+                brand=_value(first, brand_position),
                 responsible=_value(first, RESPONSIBLE),
                 drive_status=_value(first, DRIVE_STATUS),
-                price=_parse_number(_value(first, FINAL_PRICE), "precio final redondeo"),
-                height_cm=_parse_number(_value(first, HEIGHT), "alto"),
-                width_cm=_parse_number(_value(first, WIDTH), "ancho"),
-                depth_cm=_parse_number(_value(first, DEPTH), "profundidad"),
+                price=_parse_number(_value(first, final_price_position), "precio final redondeo"),
+                height_cm=_parse_number(_value(first, height_position), "alto"),
+                width_cm=_parse_number(_value(first, width_position), "ancho"),
+                depth_cm=_parse_number(_value(first, depth_position), "profundidad"),
                 shipping_weight_kg=_parse_number(
                     _value(first, SHIPPING_WEIGHT), "peso de envío"
                 ),
                 variants=variants,
+                abizi_status=_value(first, ABIZI_STATUS),
+                crazy_status=_value(first, CRAZY_STATUS),
+                ofertas_status=_value(first, OFERTAS_STATUS),
             )
         )
     return sorted(products, key=lambda product: product.sku_base)
@@ -140,7 +173,17 @@ def fetch_products(csv_url: str) -> list[SourceProduct]:
     rows = list(csv.reader(io.StringIO(csv_content)))
     if len(rows) < 3:
         raise SourceProductsError("La hoja fuente no contiene filas de productos")
-    return _group_products(rows[2:])
+    columns = None
+    header = [value.strip().casefold() for value in rows[1]]
+    if len(header) > 10 and header[9] == "color" and header[10] == "talla":
+        columns = {
+            "size": 10,
+            "height": 14,
+            "width": 15,
+            "depth": 16,
+            "shipping_weight": 17,
+        }
+    return _group_products(rows[2:], columns=columns)
 
 
 def get_product(products: Iterable[SourceProduct], sku_base: str) -> SourceProduct:

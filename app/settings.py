@@ -20,6 +20,16 @@ class Settings(BaseSettings):
         "1DAICEPsph-ORFQquheCFOlLSjMUgwyqN/edit?"
         "gid=1469600269#gid=1469600269"
     )
+    ripholia_15_sheet_csv_url: str = (
+        "https://docs.google.com/spreadsheets/d/"
+        "169GsmKhYKrF5UPOhLxEj1gX_Vt_Jl3p2/gviz/tq?"
+        "tqx=out:csv&gid=1843448798"
+    )
+    ripholia_15_sheet_web_url: str = (
+        "https://docs.google.com/spreadsheets/d/"
+        "169GsmKhYKrF5UPOhLxEj1gX_Vt_Jl3p2/edit?"
+        "gid=1843448798#gid=1843448798"
+    )
     image_sheet_csv_url: str = (
         "https://docs.google.com/spreadsheets/d/"
         "1QJ0c09aTCYljqNZOZM6SRGzYMag1QsNKG7N1LyJGaKg/export?"

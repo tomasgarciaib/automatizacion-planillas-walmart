@@ -1,4 +1,4 @@
-# Automatización de planillas Walmart
+# Automatización de Plantillas de Productos
 
 Aplicación web interna para preparar, validar y organizar planillas de productos antes de cargarlas en Walmart.
 

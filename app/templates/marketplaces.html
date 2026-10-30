@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Marketplaces | Planillas{% endblock %}
+{% block content %}
+<section class="intro marketplace-intro">
+  <p class="eyebrow">Inicio</p>
+  <h1>Selecciona un marketplace</h1>
+  <p>Elige el canal en el que quieres preparar o revisar tus productos.</p>
+</section>
+
+<section class="marketplace-list" aria-label="Marketplaces disponibles">
+  <a class="marketplace-button marketplace-button--active" href="/walmart">
+    <span>Walmart</span>
+    <small>Ver SKU ML sin asignar</small>
+  </a>
+  <a class="marketplace-button marketplace-button--disabled" href="#" aria-disabled="true">
+    <span>Falabella</span>
+    <small>Próximamente</small>
+  </a>
+  <a class="marketplace-button marketplace-button--disabled" href="#" aria-disabled="true">
+    <span>Sencosud</span>
+    <small>Próximamente</small>
+  </a>
+  <a class="marketplace-button marketplace-button--disabled" href="#" aria-disabled="true">
+    <span>Mercado Libre</span>
+    <small>Próximamente</small>
+  </a>
+</section>
+{% endblock %}

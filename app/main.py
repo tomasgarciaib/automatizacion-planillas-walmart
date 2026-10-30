@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Automatización de planillas Walmart",
+    title="Automatización de Plantillas de Productos",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -90,25 +90,188 @@ def generate_ean_codes(number_of_codes: int = 1) -> dict[str, list[str]]:
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(
+def marketplace_selector(request: Request):
+    """Muestra el selector inicial de marketplaces disponibles."""
+    return templates.TemplateResponse(request, "marketplaces.html", {})
+
+
+@app.get("/walmart", response_class=HTMLResponse)
+def walmart_groups(
+    request: Request,
+    settings: Settings = Depends(app_settings),
+):
+    """Muestra los grupos de trabajo disponibles para Walmart."""
+    source_error = None
+    pending_count = 0
+    ripholia_15_source_error = None
+    ripholia_15_pending_count = 0
+    try:
+        products = fetch_products(settings.source_sheet_csv_url)
+        pending_count = sum(
+            len(product.variants)
+            for product in products
+            if not product.responsible.strip()
+        )
+    except SourceProductsError as error:
+        source_error = str(error)
+    try:
+        products = fetch_products(settings.ripholia_15_sheet_csv_url)
+        ripholia_15_pending_count = sum(
+            len(product.variants)
+            for product in products
+            if not product.responsible.strip()
+        )
+    except SourceProductsError as error:
+        ripholia_15_source_error = str(error)
+
+    return templates.TemplateResponse(
+        request,
+        "walmart_groups.html",
+        {
+            "pending_count": pending_count,
+            "source_error": source_error,
+            "ripholia_15_pending_count": ripholia_15_pending_count,
+            "ripholia_15_source_error": ripholia_15_source_error,
+        },
+    )
+
+
+@app.get("/walmart/ripholia-duplicados-35", response_class=HTMLResponse)
+def walmart_group_duplicados_35(
     request: Request,
     q: str = "",
     show_all: bool = False,
+    responsible: str | None = None,
+    drive_status: str | None = None,
+    abizi_status: str | None = None,
+    crazy_status: str | None = None,
+    ofertas_status: str | None = None,
     settings: Settings = Depends(app_settings),
+):
+    return _walmart_group(
+        request,
+        q=q,
+        show_all=show_all,
+        responsible=responsible,
+        drive_status=drive_status,
+        abizi_status=abizi_status,
+        crazy_status=crazy_status,
+        ofertas_status=ofertas_status,
+        source_csv_url=settings.source_sheet_csv_url,
+        source_web_url=settings.source_sheet_web_url,
+        group_path="/walmart/ripholia-duplicados-35",
+        group_name="Ripholia duplicados 35",
+    )
+
+
+@app.get("/walmart/ripholia-15", response_class=HTMLResponse)
+def walmart_group_ripholia_15(
+    request: Request,
+    q: str = "",
+    show_all: bool = False,
+    responsible: str | None = None,
+    drive_status: str | None = None,
+    abizi_status: str | None = None,
+    crazy_status: str | None = None,
+    ofertas_status: str | None = None,
+    settings: Settings = Depends(app_settings),
+):
+    return _walmart_group(
+        request,
+        q=q,
+        show_all=show_all,
+        responsible=responsible,
+        drive_status=drive_status,
+        abizi_status=abizi_status,
+        crazy_status=crazy_status,
+        ofertas_status=ofertas_status,
+        source_csv_url=settings.ripholia_15_sheet_csv_url,
+        source_web_url=settings.ripholia_15_sheet_web_url,
+        group_path="/walmart/ripholia-15",
+        group_name="Ripholia 15",
+    )
+
+
+def _walmart_group(
+    request: Request,
+    source_csv_url: str,
+    source_web_url: str,
+    group_path: str,
+    group_name: str,
+    q: str = "",
+    show_all: bool = False,
+    responsible: str | None = None,
+    drive_status: str | None = None,
+    abizi_status: str | None = None,
+    crazy_status: str | None = None,
+    ofertas_status: str | None = None,
 ):
     """Muestra SKU ML pendientes y permite entrar por el SKU hijo."""
     source_error = None
     products: list[SourceProduct] = []
     try:
-        products = fetch_products(settings.source_sheet_csv_url)
+        products = fetch_products(source_csv_url)
     except SourceProductsError as error:
         source_error = str(error)
 
+    responsible_options = sorted(
+        {
+            product.responsible.strip()
+            for product in products
+            if product.responsible.strip()
+        },
+        key=str.casefold,
+    )
+    selected_responsible = responsible or "__unassigned__"
+    status_definitions = (
+        ("drive_status", "Estado/DRIVE", drive_status),
+        ("abizi_status", "ABIZI", abizi_status),
+        ("crazy_status", "CRAZY", crazy_status),
+        ("ofertas_status", "OFERTAS", ofertas_status),
+    )
+    status_filters = []
+    for field_name, label, selected in status_definitions:
+        values = sorted(
+            {getattr(product, field_name).strip() for product in products},
+            key=str.casefold,
+        )
+        status_filters.append(
+            {
+                "field": field_name,
+                "label": label,
+                "options": values,
+                "selected": selected or "__empty__",
+            }
+        )
     sku_items = [
         {"product": product, "variant": variant}
         for product in products
         for variant in product.variants
     ]
+    if selected_responsible == "__unassigned__":
+        sku_items = [item for item in sku_items if not item["product"].responsible.strip()]
+    elif selected_responsible != "__all__":
+        sku_items = [
+            item
+            for item in sku_items
+            if item["product"].responsible.strip().casefold()
+            == selected_responsible.casefold()
+        ]
+    for field_name, _, selected in status_definitions:
+        selected_status = selected or "__empty__"
+        if selected_status == "__all__":
+            continue
+        if selected_status == "__empty__":
+            sku_items = [
+                item for item in sku_items if not getattr(item["product"], field_name).strip()
+            ]
+        else:
+            sku_items = [
+                item
+                for item in sku_items
+                if getattr(item["product"], field_name).strip().casefold()
+                == selected_status.casefold()
+            ]
     query = q.strip().casefold()
     if query:
         sku_items = [
@@ -119,11 +282,6 @@ def dashboard(
             or query in item["product"].description.casefold()
             or query in item["product"].brand.casefold()
         ]
-    elif not show_all:
-        sku_items = [
-            item for item in sku_items if not item["product"].responsible.strip()
-        ]
-
     return templates.TemplateResponse(
         request,
         "products.html",
@@ -131,8 +289,13 @@ def dashboard(
             "sku_items": sku_items,
             "query": q,
             "show_all": show_all,
+            "responsible_options": responsible_options,
+            "selected_responsible": selected_responsible,
+            "status_filters": status_filters,
             "source_error": source_error,
-            "source_sheet_url": settings.source_sheet_web_url,
+            "source_sheet_url": source_web_url,
+            "group_path": group_path,
+            "group_name": group_name,
         },
     )
 
@@ -168,11 +331,16 @@ def _image_sheet_sku(sku_base: str) -> str:
 
 
 def _get_source_product(
-    settings: Settings, sku_ml: str
+    settings: Settings, sku_ml: str, source_group: str = "ripholia-duplicados-35"
 ) -> tuple[SourceProduct, ProductVariant]:
+    source_csv_url = (
+        settings.ripholia_15_sheet_csv_url
+        if source_group == "ripholia-15"
+        else settings.source_sheet_csv_url
+    )
     try:
         return get_product_by_sku_ml(
-            fetch_products(settings.source_sheet_csv_url), sku_ml
+            fetch_products(source_csv_url), sku_ml
         )
     except SourceProductsError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
@@ -192,6 +360,8 @@ def _build_product_rows(
     warranty_condition: str,
     gender: str,
     color: str,
+    model: str,
+    variant_group_id: str,
     material: str,
     features: str,
     keywords: str,
@@ -232,12 +402,12 @@ def _build_product_rows(
                 "AE": gender,
                 "AF": color,
                 "AG": material,
-                "AH": walmart_parent_sku,
+                "AH": model,
                 "AI": features,
                 "AJ": keywords,
                 "AR": variant.size,
                 "AS": "Adulto",
-                "EY": walmart_parent_sku,
+                "EY": variant_group_id,
                 "EZ": "Color",
                 "FA": "Talla de ropa",
                 "FB": "Sí" if index == 0 else "No",
@@ -251,9 +421,21 @@ def sku_ml_detail(
     sku_ml: str,
     request: Request,
     message: str | None = None,
+    source_group: str = "ripholia-duplicados-35",
     settings: Settings = Depends(app_settings),
 ):
-    product, selected_variant = _get_source_product(settings, sku_ml)
+    product, selected_variant = _get_source_product(settings, sku_ml, source_group)
+    source_web_url = (
+        settings.ripholia_15_sheet_web_url
+        if source_group == "ripholia-15"
+        else settings.source_sheet_web_url
+    )
+    group_path = (
+        "/walmart/ripholia-15"
+        if source_group == "ripholia-15"
+        else "/walmart/ripholia-duplicados-35"
+    )
+    group_name = "Ripholia 15" if source_group == "ripholia-15" else "Ripholia duplicados 35"
     with get_connection(settings.database_path) as connection:
         template = connection.execute(
             "SELECT id, original_name, stored_name, uploaded_at "
@@ -278,7 +460,10 @@ def sku_ml_detail(
             "outputs": outputs,
             "message": message,
             "price_display": _format_price(product.price),
-            "source_sheet_url": settings.source_sheet_web_url,
+            "source_sheet_url": source_web_url,
+            "source_group": source_group,
+            "group_path": group_path,
+            "group_name": group_name,
         },
     )
 
@@ -337,6 +522,7 @@ async def upload_walmart_template(
 @app.post("/sku-ml/{sku_ml}/generate")
 def generate_product_template(
     sku_ml: str,
+    source_group: str = Form("ripholia-duplicados-35"),
     template_id: int = Form(...),
     product_name: str = Form(...),
     image_sheet_sku: str = Form(...),
@@ -348,12 +534,14 @@ def generate_product_template(
     warranty_condition: str = Form(...),
     gender: str = Form(...),
     color: str = Form(...),
+    model: str = Form(...),
+    variant_group_id: str = Form(...),
     material: str = Form(...),
     features: str = Form(...),
     keywords: str = Form(...),
     settings: Settings = Depends(app_settings),
 ):
-    product, _ = _get_source_product(settings, sku_ml)
+    product, _ = _get_source_product(settings, sku_ml, source_group)
     warranty_text = WARRANTY_TEXT
     warranty_condition = WARRANTY_CONDITION
     try:
@@ -369,6 +557,8 @@ def generate_product_template(
         "Condiciones de garantía": warranty_condition,
         "Género": gender,
         "Color": color,
+        "Modelo": model,
+        "ID de grupo variante": variant_group_id,
         "Material": material,
         "Características": features,
         "Palabras clave": keywords,
@@ -455,6 +645,8 @@ def generate_product_template(
                     warranty_condition=warranty_condition.strip(),
                     gender=gender.strip(),
                     color=color.strip(),
+                    model=model.strip(),
+                    variant_group_id=variant_group_id.strip(),
                     material=material.strip(),
                     features=features.strip(),
                     keywords=keywords.strip(),

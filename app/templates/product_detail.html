@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ selected_variant.sku }} | Planillas Walmart{% endblock %}
+{% block title %}{{ selected_variant.sku }} | Automatización de Plantillas de Productos{% endblock %}
 {% block content %}
-<a class="back-link" href="/">← Volver a SKU ML pendientes</a>
+<a class="back-link" href="/walmart">← Volver a SKU ML pendientes</a>
 
 <section class="intro product-intro">
   <p class="eyebrow">SKU ML seleccionado</p>
-  <h1>{{ selected_variant.sku }}</h1>
+  <h1 data-selected-sku-heading>{{ selected_variant.sku }}</h1>
   <p>{{ product.description }}</p>
   <p class="field-help"><strong>SKU Base:</strong> {{ product.sku_base }}. Se incluirán todos sus SKU ML en la misma planilla.</p>
   <p class="field-help"><strong>SKU padre en Walmart:</strong> {{ walmart_parent_sku }}</p>
@@ -19,13 +19,20 @@
   <article><span>Precio final</span><strong>{{ price_display }}</strong></article>
   <article><span>Medidas</span><strong>{{ product.height_cm }} × {{ product.width_cm }} × {{ product.depth_cm }} cm</strong></article>
   <article><span>Peso de envío</span><strong>{{ product.shipping_weight_kg }} kg</strong></article>
-  <article><span>SKU ML elegido</span><strong>{{ selected_variant.sku }}</strong></article>
+      <article><span>SKU ML elegido</span><strong data-selected-sku>{{ selected_variant.sku }}</strong></article>
 </section>
 
 <section class="card">
   <p class="eyebrow">Paso 1</p>
   <h2>SKU ML que se cargarán</h2>
   <p>El SKU Base {{ product.sku_base }} tiene {{ product.variants|length }} SKU ML. Se creará una fila por cada uno.</p>
+  <div class="variant-button-list" aria-label="SKU hijos del SKU padre">
+    {% for variant in product.variants %}
+    <button type="button" class="variant-button{% if variant.sku.casefold() == selected_variant.sku.casefold() %} variant-button--active{% endif %}" data-sku="{{ variant.sku }}">
+      <strong>{{ variant.sku }}</strong><span>Talla {{ variant.size }}</span>
+    </button>
+    {% endfor %}
+  </div>
   <div class="variants-list">
     {% for variant in product.variants %}<span><strong>{{ variant.sku }}</strong> · Talla {{ variant.size }}</span>{% endfor %}
   </div>
@@ -44,6 +51,7 @@
 
 {% if template %}
 <form class="product-form" method="post" action="/sku-ml/{{ selected_variant.sku }}/generate">
+  <input type="hidden" name="source_group" value="{{ source_group }}" />
   <input type="hidden" name="template_id" value="{{ template.id }}" />
   <section class="card">
     <p class="eyebrow">Datos por completar</p>
@@ -87,10 +95,11 @@
     <div class="form-grid form-grid-three">
       <label>Género<select name="gender" required><option selected>Mujer</option><option>Hombre</option><option>Unisex</option></select></label>
       <label>Color<input name="color" value="{{ product.suggested_color }}" required /></label>
-      <p class="field-help"><strong>Modelo e ID de grupo variante para Walmart:</strong> {{ walmart_parent_sku }}</p>
+      <label>Modelo<input name="model" value="{{ walmart_parent_sku }}" required /><span class="field-help">Puedes modificar el modelo antes de generar.</span></label>
+      <label>ID de grupo variante<input name="variant_group_id" value="{{ walmart_parent_sku }}" required /><span class="field-help">Puedes modificar el ID de grupo antes de generar.</span></label>
       <label>Grupo etario<input value="Adulto" disabled /><span class="field-help">Se completa automáticamente.</span></label>
     </div>
-    <p class="field-help">Condición: Nuevo. Garantía proporcionada por el vendedor: Garantia del Vendedor. Duración: 6 meses. Modelo e ID de grupo variante: {{ product.sku_base }}. Atributos: Color y Talla de ropa.</p>
+    <p class="field-help">Condición: Nuevo. Garantía proporcionada por el vendedor: Garantia del Vendedor. Duración: 6 meses. Atributos: Color y Talla de ropa.</p>
   </section>
 
   <section class="generate-bar">
@@ -120,6 +129,83 @@
   }
 
   generateEanCodes();
+</script>
+<script>
+  const productForm = document.querySelector(".product-form");
+  const variantButtons = document.querySelectorAll(".variant-button[data-sku]");
+  const selectedSkuLabel = document.querySelector("[data-selected-sku]");
+  const selectedSkuHeading = document.querySelector("[data-selected-sku-heading]");
+  const sourceGroup = "{{ source_group }}";
+  let activeSku = "{{ selected_variant.sku }}";
+  const initialFormState = readFormState();
+
+  function storageKey(sku) {
+    return `product-form:${sourceGroup}:${sku}`;
+  }
+
+  function readFormState() {
+    const state = {};
+    for (const field of productForm.elements) {
+      if (!field.name || field.type === "submit" || field.type === "button") continue;
+      state[field.name] = field.value;
+    }
+    return state;
+  }
+
+  function saveFormState(sku) {
+    try {
+      localStorage.setItem(storageKey(sku), JSON.stringify(readFormState()));
+    } catch (error) {
+      console.warn("No se pudo guardar el formulario localmente", error);
+    }
+  }
+
+  function loadFormState(sku) {
+    try {
+      const saved = localStorage.getItem(storageKey(sku));
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function applyFormState(state) {
+    for (const field of productForm.elements) {
+      if (field.name && Object.prototype.hasOwnProperty.call(state, field.name)) {
+        field.value = state[field.name];
+      }
+    }
+  }
+
+  function selectVariant(sku) {
+    if (sku === activeSku) return;
+    saveFormState(activeSku);
+    activeSku = sku;
+    const savedState = loadFormState(sku);
+    if (savedState) {
+      applyFormState(savedState);
+      eanStatus.textContent = "Formulario guardado restaurado para este SKU hijo.";
+    } else {
+      const newState = { ...initialFormState, ean_codes: "" };
+      applyFormState(newState);
+      generateEanCodes();
+    }
+    productForm.action = `/sku-ml/${encodeURIComponent(sku)}/generate`;
+    selectedSkuLabel.textContent = sku;
+    selectedSkuHeading.textContent = sku;
+    document.title = `${sku} | Automatización de Plantillas de Productos`;
+    for (const button of variantButtons) {
+      button.classList.toggle("variant-button--active", button.dataset.sku === sku);
+    }
+  }
+
+  for (const button of variantButtons) {
+    button.addEventListener("click", () => selectVariant(button.dataset.sku));
+  }
+  for (const field of productForm.elements) {
+    field.addEventListener("input", () => saveFormState(activeSku));
+    field.addEventListener("change", () => saveFormState(activeSku));
+  }
 </script>
 {% endif %}
 
